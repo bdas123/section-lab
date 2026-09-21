@@ -1,0 +1,69 @@
+// Small demo set showing the non-quant question types the engine supports:
+// stimulus passages, data tables, multi-select, and two-part analysis.
+window.registerSet({
+  id: "di-demo",
+  title: "Data Insights Warm-Up (demo)",
+  section: "Data Insights",
+  minutes: 10,
+  note: "Four questions in 10 minutes. Included mainly to show that the engine handles passages, tables, multi-select, and two-part analysis, not just Problem Solving.",
+  questions: [
+    {
+      id: 1, topic: "Table Analysis", diff: "Medium", target: 150, type: "multi",
+      stimulus: {
+        text: "Quarterly results for four regional offices of a logistics firm (revenue in $ millions):",
+        table: {
+          headers: ["Office", "Q1 Revenue", "Q2 Revenue", "Q2 Margin"],
+          rows: [
+            ["North", "12.0", "15.0", "8%"],
+            ["South", "20.0", "18.0", "12%"],
+            ["East", "9.0", "13.5", "6%"],
+            ["West", "25.0", "26.0", "5%"]
+          ]
+        }
+      },
+      stem: "Select every statement that the table supports.",
+      choices: [
+        "East had the largest percent increase in revenue from Q1 to Q2.",
+        "The office with the highest Q2 revenue also had the highest Q2 margin.",
+        "Total Q2 revenue for the four offices exceeded total Q1 revenue.",
+        "South was the only office whose revenue declined from Q1 to Q2."
+      ],
+      answers: [0, 2, 3],
+      why: "East grew 50% versus North's 25%, so the first statement holds. West had the highest Q2 revenue but the lowest margin, so the second fails. Totals were 66.0 in Q1 and 72.5 in Q2, and only South declined."
+    },
+    {
+      id: 2, topic: "Two-Part Analysis", diff: "Hard", target: 165, type: "twopart",
+      stem: "A caterer buys x trays of sandwiches at $40 each and y trays of salad at $25 each. She buys 12 trays in total and spends $405. Select the number of sandwich trays and the number of salad trays.",
+      twoPartHeaders: ["Sandwich trays", "Salad trays"],
+      choices: ["5", "6", "7", "8", "9"],
+      answers: [2, 0],
+      why: "40x + 25(12 − x) = 405 → 15x = 105 → x = 7 sandwich trays and 5 salad trays."
+    },
+    {
+      id: 3, topic: "Critical Reasoning", diff: "Medium", target: 140, type: "mcq",
+      stimulus: {
+        text: "City officials note that since a bike-share program launched downtown two years ago, downtown car traffic has fallen 9%. They conclude that the bike-share program caused the decline in car traffic."
+      },
+      stem: "Which of the following, if true, most weakens the officials' conclusion?",
+      choices: [
+        "Bike-share memberships grew steadily over the two-year period.",
+        "Two large downtown employers shifted most of their staff to remote work during the same period.",
+        "A neighboring city with no bike-share program saw car traffic rise by 2%.",
+        "Most bike-share trips downtown are shorter than one mile.",
+        "The city spent less on the bike-share program than it had budgeted."
+      ],
+      answer: 1,
+      why: "An alternative cause for the traffic decline undermines the causal claim. The remote-work shift explains fewer cars without the bike-share program doing the work."
+    },
+    {
+      id: 4, topic: "Data Interpretation", diff: "Easy", target: 110, type: "mcq",
+      stimulus: {
+        text: "A survey of 400 commuters found that 180 drive, 120 take transit, 60 bike, and the remainder walk."
+      },
+      stem: "What percent of the surveyed commuters walk?",
+      choices: ["5%", "10%", "15%", "20%", "25%"],
+      answer: 1,
+      why: "400 − (180 + 120 + 60) = 40 walkers, and 40/400 = 10%."
+    }
+  ]
+});

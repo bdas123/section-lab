@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Section Lab — timed GMAT section trainer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='17' r='11' fill='none' stroke='%23127f8c' stroke-width='3'/%3E%3Cpath d='M16 17V10' stroke='%23127f8c' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 32 32" fill="none" aria-label="Section Lab logo">
+      <circle cx="16" cy="17.5" r="11" stroke="currentColor" stroke-width="2.2" />
+      <path d="M16 17.5V10.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+      <path d="M16 17.5l5.2 3.4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+      <path d="M11.5 3.5h9" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+    </svg>
+    <div>
+      <div class="brand-name">SECTION LAB</div>
+      <div class="brand-sub" id="brandSub">Timed GMAT section trainer</div>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="timer hidden" id="timer" data-state="ok" role="timer" aria-live="off">
+    <span class="lbl">Time left</span><span class="t mono" id="timeLeft">45:00</span>
+  </div>
+  <button class="btn btn-ghost hidden" id="pauseBtn" type="button">Pause</button>
+  <button class="icon-btn" id="themeBtn" type="button" aria-label="Toggle dark mode">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="themeIcon">
+      <circle cx="12" cy="12" r="4.5" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4" stroke-linecap="round" />
+    </svg>
+  </button>
+</header>
+<div class="progress"><i id="progressBar" style="width:0%"></i></div>
+
+<main>
+  <!-- SETUP -->
+  <div id="screenSetup">
+    <div class="setup-head">
+      <div class="eyebrow">Section trainer</div>
+      <h1>Pick a set, start the clock</h1>
+      <p>The clock runs like the real thing: one countdown for the whole section, per-question timing recorded in the background, no pausing unless you choose practice mode. When time expires or you submit, you get a full pacing and accuracy breakdown you can paste into your error log.</p>
+    </div>
+
+    <div class="set-grid" id="setGrid"></div>
+
+    <div class="opts">
+      <label class="opt"><input type="checkbox" id="optShuffle" /> Shuffle question order</label>
+      <label class="opt"><input type="checkbox" id="optPausable" /> Practice mode (allow pausing)</label>
+      <label class="opt"><input type="checkbox" id="optReveal" /> Show answer after each question</label>
+    </div>
+
+    <div class="start-row">
+      <button class="btn btn-primary" id="startBtn" type="button">Start section</button>
+      <span class="hint" id="startHint"></span>
+    </div>
+
+    <details class="loader">
+      <summary>Load a new question set (paste JSON)</summary>
+      <p class="hint" style="margin-top:var(--space-3);color:var(--ink-3);font-size:var(--text-xs)">Paste a set object in the documented format and it appears above. Sets I hand you in future sessions can be dropped in here or added as a file under <span class="mono">sets/</span>.</p>
+      <textarea id="setJson" spellcheck="false" placeholder='{"title":"Verbal Section 1","section":"Verbal Reasoning","minutes":45,"questions":[{"topic":"Critical Reasoning","diff":"Medium","target":140,"stem":"...","choices":["A","B"],"answer":0,"why":"..."}]}'></textarea>
+      <div style="margin-top:var(--space-3);display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap">
+        <button class="btn" id="loadSetBtn" type="button">Add set</button>
+        <span class="hint" id="loadMsg" style="font-size:var(--text-xs);color:var(--ink-3)"></span>
+      </div>
+    </details>
+  </div>
+
+  <!-- EXAM -->
+  <div id="screenExam" class="hidden">
+    <div class="card">
+      <div class="qhead">
+        <span class="qcount" id="qCount">Question 1 of 21</span>
+        <span class="chip" id="qTopic">Topic</span>
+        <span class="chip" id="qDiff">Medium</span>
+        <div class="spacer"></div>
+        <span class="qtime mono" id="qTime">0:00</span>
+      </div>
+      <div id="qStimulus"></div>
+      <div class="stem" id="qStem"></div>
+      <div id="qBody"></div>
+      <div id="qFeedback"></div>
+      <div class="navrow">
+        <button class="btn" id="prevBtn" type="button">Back</button>
+        <button class="btn btn-primary" id="nextBtn" type="button">Next</button>
+        <button class="btn btn-ghost" id="flagBtn" type="button">Flag for review</button>
+        <div class="spacer"></div>
+        <button class="btn" id="submitBtn" type="button">Submit section</button>
+      </div>
+      <div class="palette" id="palette"></div>
+    </div>
+  </div>
+
+  <!-- REPORT -->
+  <div id="screenReport" class="hidden"></div>
+</main>
+
+<script src="app.js"></script>
+<script src="sets/quant-01.js"></script>
+<script src="sets/di-demo.js"></script>
+<script>window.bootSectionLab();</script>
+</body>
+</html>

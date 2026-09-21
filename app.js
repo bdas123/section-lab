@@ -1,0 +1,698 @@
+/* Section Lab — reusable timed-section engine for GMAT-style practice sets.
+   Works for any section (Quant, Verbal, Data Insights) and question types:
+   mcq (single answer), multi (select all), twopart (two-column selection).      */
+
+(function () {
+  "use strict";
+
+  const SETS = [];
+  const LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+
+  window.registerSet = function (set) {
+    const s = normalizeSet(set);
+    SETS.push(s);
+    if (window.__slReady) renderSetGrid();
+    return s;
+  };
+
+  function normalizeSet(raw) {
+    const set = Object.assign({}, raw);
+    set.id = set.id || "set-" + (SETS.length + 1);
+    set.section = set.section || "Practice Section";
+    set.title = set.title || set.section;
+    set.questions = (set.questions || []).map(function (q, i) {
+      const n = Object.assign({}, q);
+      n.type = n.type || (Array.isArray(n.answers) && n.twoPartHeaders ? "twopart" : Array.isArray(n.answers) ? "multi" : "mcq");
+      n.id = n.id || i + 1;
+      n.topic = n.topic || "Untagged";
+      n.diff = n.diff || "Medium";
+      n.target = n.target || Math.round(((set.minutes || 45) * 60) / Math.max(1, (set.questions || []).length));
+      return n;
+    });
+    set.minutes = set.minutes || Math.max(1, Math.round(set.questions.reduce((a, q) => a + q.target, 0) / 60));
+    return set;
+  }
+
+  /* ---------------- state ---------------- */
+  const S = {
+    set: null, order: [], cur: 0,
+    answers: {}, times: {}, flags: {},
+    total: 0, remaining: 0, paused: false,
+    tick: null, lastStamp: 0, qStamp: 0,
+    reveal: false, pausable: false, finished: false
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n; };
+  const fmt = (sec) => {
+    sec = Math.max(0, Math.round(sec));
+    const m = Math.floor(sec / 60);
+    return m + ":" + String(sec % 60).padStart(2, "0");
+  };
+
+  /* ---------------- setup screen ---------------- */
+  let selectedSetId = null;
+
+  function renderSetGrid() {
+    const grid = $("setGrid");
+    grid.innerHTML = "";
+    if (!SETS.length) {
+      const empty = el("div", "card");
+      empty.appendChild(el("p", null, "No question sets loaded yet. Paste one below to get started."));
+      grid.appendChild(empty);
+      return;
+    }
+    if (!SETS.some((s) => s.id === selectedSetId)) selectedSetId = SETS[0].id;
+    SETS.forEach(function (set) {
+      const b = el("button", "card set-card");
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(set.id === selectedSetId));
+      b.appendChild(el("div", "eyebrow", set.section));
+      b.appendChild(el("h3", null, set.title));
+      const meta = el("div", "meta");
+      meta.appendChild(el("span", null, set.questions.length + " questions"));
+      meta.appendChild(el("span", null, set.minutes + " minutes"));
+      meta.appendChild(el("span", null, fmt((set.minutes * 60) / set.questions.length) + " per question"));
+      b.appendChild(meta);
+      if (set.note) b.appendChild(el("p", "note", set.note));
+      b.addEventListener("click", function () { selectedSetId = set.id; renderSetGrid(); updateHint(); });
+      grid.appendChild(b);
+    });
+  }
+
+  function currentSet() { return SETS.find((s) => s.id === selectedSetId) || SETS[0]; }
+
+  function updateHint() {
+    const set = currentSet();
+    $("startHint").textContent = set
+      ? set.questions.length + " questions · " + set.minutes + ":00 on the clock"
+      : "";
+  }
+
+  /* ---------------- exam flow ---------------- */
+  function startSection() {
+    const set = currentSet();
+    if (!set || !set.questions.length) return;
+    S.set = set;
+    S.order = set.questions.map((_, i) => i);
+    if ($("optShuffle").checked) {
+      for (let i = S.order.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [S.order[i], S.order[j]] = [S.order[j], S.order[i]];
+      }
+    }
+    S.reveal = $("optReveal").checked;
+    S.pausable = $("optPausable").checked;
+    S.answers = {}; S.times = {}; S.flags = {};
+    S.cur = 0; S.finished = false; S.paused = false;
+    S.total = set.minutes * 60;
+    S.remaining = S.total;
+    $("brandSub").textContent = set.section;
+    $("screenSetup").classList.add("hidden");
+    $("screenReport").classList.add("hidden");
+    $("screenExam").classList.remove("hidden");
+    $("timer").classList.remove("hidden");
+    $("pauseBtn").classList.toggle("hidden", !S.pausable);
+    S.lastStamp = performance.now();
+    S.qStamp = S.lastStamp;
+    if (S.tick) clearInterval(S.tick);
+    S.tick = setInterval(loop, 200);
+    renderQuestion();
+    window.scrollTo({ top: 0 });
+  }
+
+  function loop() {
+    if (S.paused || S.finished) { S.lastStamp = performance.now(); return; }
+    const now = performance.now();
+    const d = (now - S.lastStamp) / 1000;
+    S.lastStamp = now;
+    S.remaining -= d;
+    if (S.remaining <= 0) { S.remaining = 0; finish(true); return; }
+    paintTimer();
+  }
+
+  function paintTimer() {
+    $("timeLeft").textContent = fmt(S.remaining);
+    const t = $("timer");
+    const frac = S.remaining / S.total;
+    t.dataset.state = frac <= 0.07 ? "crit" : frac <= 0.2 ? "warn" : "ok";
+    const q = curQ();
+    const spent = elapsedOnCurrent();
+    const qt = $("qTime");
+    qt.textContent = fmt(spent) + " / " + fmt(q.target);
+    qt.dataset.over = String(spent > q.target);
+    $("progressBar").style.width = ((S.total - S.remaining) / S.total) * 100 + "%";
+  }
+
+  function curQ() { return S.set.questions[S.order[S.cur]]; }
+  function curKey() { return S.order[S.cur]; }
+  function elapsedOnCurrent() {
+    const banked = S.times[curKey()] || 0;
+    return banked + (S.paused || S.finished ? 0 : (performance.now() - S.qStamp) / 1000);
+  }
+  function bankTime() {
+    const k = curKey();
+    S.times[k] = (S.times[k] || 0) + (performance.now() - S.qStamp) / 1000;
+    S.qStamp = performance.now();
+  }
+
+  function goTo(i) {
+    if (i < 0 || i >= S.order.length) return;
+    bankTime();
+    S.cur = i;
+    renderQuestion();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function renderQuestion() {
+    const q = curQ();
+    const k = curKey();
+    $("qCount").textContent = "Question " + (S.cur + 1) + " of " + S.order.length;
+    $("qTopic").textContent = q.topic;
+    $("qDiff").textContent = q.diff;
+    $("prevBtn").disabled = S.cur === 0;
+    $("nextBtn").textContent = S.cur === S.order.length - 1 ? "Review" : "Next";
+    $("flagBtn").textContent = S.flags[k] ? "Unflag" : "Flag for review";
+
+    const stim = $("qStimulus");
+    stim.innerHTML = "";
+    if (q.stimulus) {
+      const box = el("div", "stimulus");
+      if (q.stimulus.text) box.appendChild(el("p", null, q.stimulus.text));
+      if (q.stimulus.table) {
+        const t = el("table", "data");
+        const thead = el("thead"), tr = el("tr");
+        q.stimulus.table.headers.forEach((h) => tr.appendChild(el("th", null, h)));
+        thead.appendChild(tr); t.appendChild(thead);
+        const tb = el("tbody");
+        q.stimulus.table.rows.forEach(function (row) {
+          const r = el("tr");
+          row.forEach((c) => r.appendChild(el("td", null, c)));
+          tb.appendChild(r);
+        });
+        t.appendChild(tb); box.appendChild(t);
+      }
+      stim.appendChild(box);
+    }
+
+    $("qStem").textContent = q.stem;
+    const body = $("qBody");
+    body.innerHTML = "";
+    $("qFeedback").innerHTML = "";
+
+    if (q.type === "twopart") body.appendChild(buildTwoPart(q, k));
+    else body.appendChild(buildChoices(q, k));
+
+    renderPalette();
+    paintTimer();
+    if (S.reveal && S.answers[k] !== undefined) showFeedback(q, k);
+  }
+
+  function buildChoices(q, k) {
+    const wrap = el("div", "choices");
+    const multi = q.type === "multi";
+    if (multi) {
+      const hint = el("div", "qtime", "Select all that apply.");
+      hint.style.marginBottom = "var(--space-2)";
+      wrap.appendChild(hint);
+    }
+    q.choices.forEach(function (c, i) {
+      const b = el("button", "choice");
+      b.type = "button";
+      const sel = multi ? (S.answers[k] || []).includes(i) : S.answers[k] === i;
+      b.setAttribute("aria-pressed", String(sel));
+      b.appendChild(el("span", "key", LETTERS[i]));
+      b.appendChild(el("span", null, c));
+      b.addEventListener("click", function () {
+        if (multi) {
+          const cur = new Set(S.answers[k] || []);
+          cur.has(i) ? cur.delete(i) : cur.add(i);
+          S.answers[k] = Array.from(cur).sort((a, b2) => a - b2);
+        } else {
+          S.answers[k] = S.answers[k] === i ? undefined : i;
+        }
+        renderQuestion();
+        if (S.reveal) showFeedback(q, k);
+      });
+      wrap.appendChild(b);
+    });
+    return wrap;
+  }
+
+  function buildTwoPart(q, k) {
+    const t = el("table", "twopart");
+    const thead = el("thead"), hr = el("tr");
+    hr.appendChild(el("th", null, q.twoPartHeaders[0]));
+    hr.appendChild(el("th", null, q.twoPartHeaders[1]));
+    hr.appendChild(el("th", null, "Value"));
+    thead.appendChild(hr); t.appendChild(thead);
+    const tb = el("tbody");
+    const cur = S.answers[k] || [undefined, undefined];
+    q.choices.forEach(function (c, i) {
+      const r = el("tr");
+      [0, 1].forEach(function (col) {
+        const td = el("td");
+        const inp = document.createElement("input");
+        inp.type = "radio";
+        inp.name = "tp-" + k + "-" + col;
+        inp.checked = cur[col] === i;
+        inp.addEventListener("change", function () {
+          const a = (S.answers[k] || [undefined, undefined]).slice();
+          a[col] = i;
+          S.answers[k] = a;
+          renderPalette();
+          if (S.reveal) showFeedback(q, k);
+        });
+        td.appendChild(inp);
+        r.appendChild(td);
+      });
+      r.appendChild(el("td", null, c));
+      tb.appendChild(r);
+    });
+    t.appendChild(tb);
+    return t;
+  }
+
+  function showFeedback(q, k) {
+    const box = $("qFeedback");
+    box.innerHTML = "";
+    const good = isCorrect(q, S.answers[k]);
+    const d = el("div", "stimulus");
+    d.style.borderLeftColor = good ? "var(--ok)" : "var(--bad)";
+    d.style.marginTop = "var(--space-5)";
+    d.appendChild(el("div", "eyebrow", good ? "Correct" : "Incorrect — correct answer: " + answerLabel(q)));
+    d.appendChild(el("p", "why", q.why || ""));
+    box.appendChild(d);
+  }
+
+  function answerLabel(q) {
+    if (q.type === "twopart") return q.twoPartHeaders[0] + " = " + q.choices[q.answers[0]] + ", " + q.twoPartHeaders[1] + " = " + q.choices[q.answers[1]];
+    if (q.type === "multi") return q.answers.map((i) => LETTERS[i]).join(", ");
+    return LETTERS[q.answer];
+  }
+
+  function hasAnswer(q, a) {
+    if (a === undefined || a === null) return false;
+    if (q.type === "twopart") return a[0] !== undefined && a[1] !== undefined;
+    if (q.type === "multi") return a.length > 0;
+    return true;
+  }
+
+  function isCorrect(q, a) {
+    if (!hasAnswer(q, a)) return false;
+    if (q.type === "mcq") return a === q.answer;
+    const key = q.answers;
+    return a.length === key.length && key.every((v, i) => a[i] === v);
+  }
+
+  function renderPalette() {
+    const p = $("palette");
+    p.innerHTML = "";
+    S.order.forEach(function (qi, idx) {
+      const q = S.set.questions[qi];
+      const b = el("button", "pal", String(idx + 1));
+      b.type = "button";
+      b.dataset.answered = String(hasAnswer(q, S.answers[qi]));
+      b.dataset.flagged = String(!!S.flags[qi]);
+      b.dataset.current = String(idx === S.cur);
+      b.addEventListener("click", () => goTo(idx));
+      p.appendChild(b);
+    });
+  }
+
+  /* ---------------- report ---------------- */
+  function finish(expired) {
+    if (S.finished) return;
+    bankTime();
+    S.finished = true;
+    if (S.tick) clearInterval(S.tick);
+    $("pauseBtn").classList.add("hidden");
+    $("timer").classList.add("hidden");
+    $("screenExam").classList.add("hidden");
+    $("progressBar").style.width = "100%";
+    buildReport(expired);
+    $("screenReport").classList.remove("hidden");
+    window.scrollTo({ top: 0 });
+  }
+
+  function classify(q, a, time) {
+    const good = isCorrect(q, a);
+    if (!hasAnswer(q, a)) return { tag: "Unanswered", cls: "bad", note: "Never committed an answer — ran the clock out or skipped." };
+    if (good && time <= q.target * 1.15) return { tag: "Clean", cls: "ok", note: "Right answer, on pace." };
+    if (good && time <= q.target * 1.5) return { tag: "Slow solve", cls: "neutral", note: "Right, but " + Math.round(time - q.target) + "s over target — method was longer than needed." };
+    if (good) return { tag: "Time sink", cls: "neutral", note: "Right, but cost " + fmt(time) + ". On the real section this is what forces guesses later." };
+    if (time < q.target * 0.5) return { tag: "Careless", cls: "bad", note: "Wrong in only " + fmt(time) + " — a rushed read or arithmetic slip, not a content gap." };
+    if (time > q.target * 1.5) return { tag: "Content gap + sink", cls: "bad", note: "Wrong after " + fmt(time) + ". This is the highest-value topic to drill." };
+    return { tag: "Content gap", cls: "bad", note: "Wrong at roughly normal pace — the concept, not the clock." };
+  }
+
+  function buildReport(expired) {
+    const root = $("screenReport");
+    root.innerHTML = "";
+    const rows = S.order.map(function (qi, idx) {
+      const q = S.set.questions[qi];
+      const a = S.answers[qi];
+      const time = S.times[qi] || 0;
+      return { pos: idx + 1, q: q, a: a, time: time, correct: isCorrect(q, a), answered: hasAnswer(q, a), diag: classify(q, a, time) };
+    });
+    const n = rows.length;
+    const correct = rows.filter((r) => r.correct).length;
+    const pct = Math.round((correct / n) * 100);
+    const used = S.total - S.remaining;
+    const blanks = rows.filter((r) => !r.answered).length;
+    const careless = rows.filter((r) => r.diag.tag === "Careless").length;
+    const overTarget = rows.filter((r) => r.time > r.q.target * 1.15).length;
+    const est = 60 + Math.round((correct / n) * 30);
+
+    // head
+    const head = el("div", "report-head");
+    const left = el("div");
+    left.appendChild(el("div", "eyebrow", S.set.section + " · " + S.set.title));
+    left.appendChild(el("h1", "score-big", correct + " of " + n + " correct (" + pct + "%)"));
+    left.appendChild(el("p", "why", expired
+      ? "Time expired with " + blanks + " question" + (blanks === 1 ? "" : "s") + " unanswered. On the real section an unanswered question is a guaranteed miss, so pacing is the first thing to fix below."
+      : "Submitted with " + fmt(S.remaining) + " left on the clock."));
+    head.appendChild(left);
+    root.appendChild(head);
+
+    // KPIs
+    const kpis = el("div", "kpis");
+    const addKpi = (k, v, sub) => {
+      const c = el("div", "kpi");
+      c.appendChild(el("div", "k", k));
+      c.appendChild(el("div", "v", v));
+      if (sub) c.appendChild(el("div", "sub", sub));
+      kpis.appendChild(c);
+    };
+    addKpi("Estimated band", (est - 2) + "–" + (est + 2), "Rough, non-adaptive estimate");
+    addKpi("Time used", fmt(used), "of " + fmt(S.total));
+    addKpi("Avg per question", fmt(used / n), "target " + fmt(S.total / n));
+    addKpi("Over target", overTarget + " / " + n, "spent >15% over pace");
+    addKpi("Careless misses", String(careless), "wrong in under half the target time");
+    addKpi("Unanswered", String(blanks), blanks ? "pure pacing loss" : "nothing left blank");
+    root.appendChild(kpis);
+
+    root.appendChild(bandSection(rows));
+    root.appendChild(paceSection(rows));
+    root.appendChild(groupSection("Accuracy by topic", rows, (r) => r.q.topic));
+    root.appendChild(groupSection("Accuracy by difficulty", rows, (r) => r.q.diff));
+    root.appendChild(reviewSection(rows));
+    root.appendChild(exportSection(rows));
+
+    const again = el("div");
+    again.style.display = "flex";
+    again.style.gap = "var(--space-3)";
+    again.style.flexWrap = "wrap";
+    const back = el("button", "btn btn-primary", "Back to sets");
+    back.type = "button";
+    back.addEventListener("click", function () {
+      $("screenReport").classList.add("hidden");
+      $("screenSetup").classList.remove("hidden");
+      $("progressBar").style.width = "0%";
+      $("brandSub").textContent = "Timed GMAT section trainer";
+    });
+    const retry = el("button", "btn", "Retake this set");
+    retry.type = "button";
+    retry.addEventListener("click", function () { $("screenReport").classList.add("hidden"); startSection(); });
+    again.appendChild(back); again.appendChild(retry);
+    root.appendChild(again);
+  }
+
+  function bandSection(rows) {
+    const s = el("section", "block");
+    s.appendChild(el("h2", null, "What actually cost you points"));
+    const order = ["Careless", "Content gap", "Content gap + sink", "Unanswered", "Time sink", "Slow solve", "Clean"];
+    const counts = {};
+    rows.forEach((r) => { counts[r.diag.tag] = (counts[r.diag.tag] || 0) + 1; });
+    const bars = el("div", "bars");
+    order.forEach(function (tag) {
+      if (!counts[tag]) return;
+      const row = el("div", "bar-row");
+      row.appendChild(el("div", null, tag));
+      const track = el("div", "track");
+      const i = el("i");
+      i.style.width = (counts[tag] / rows.length) * 100 + "%";
+      if (tag === "Clean") i.style.background = "var(--ok)";
+      else if (tag.indexOf("Slow") === 0 || tag === "Time sink") i.style.background = "var(--warn)";
+      else i.style.background = "var(--bad)";
+      track.appendChild(i);
+      row.appendChild(track);
+      row.appendChild(el("div", "num", counts[tag] + " q"));
+      bars.appendChild(row);
+    });
+    s.appendChild(bars);
+    return s;
+  }
+
+  function paceSection(rows) {
+    const s = el("section", "block");
+    s.appendChild(el("h2", null, "Pacing curve"));
+    const wrap = el("div", "pace-wrap");
+    const cv = document.createElement("canvas");
+    cv.style.width = "100%";
+    cv.style.height = "220px";
+    wrap.appendChild(cv);
+    const legend = el("div", "legend");
+    const mk = (color, label) => {
+      const sp = el("span");
+      const sw = el("span", "swatch");
+      sw.style.background = color;
+      sp.appendChild(sw); sp.appendChild(document.createTextNode(label));
+      return sp;
+    };
+    legend.appendChild(mk("var(--accent)", "Your cumulative time"));
+    legend.appendChild(mk("var(--ink-3)", "Even-pace benchmark"));
+    legend.appendChild(mk("var(--bad)", "Missed question"));
+    wrap.appendChild(legend);
+    s.appendChild(wrap);
+    requestAnimationFrame(() => drawPace(cv, rows));
+    return s;
+  }
+
+  function drawPace(cv, rows) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth || 600, h = 220;
+    cv.width = w * dpr; cv.height = h * dpr;
+    const c = cv.getContext("2d");
+    c.scale(dpr, dpr);
+    const css = getComputedStyle(document.body);
+    const ink3 = css.getPropertyValue("--ink-3") || "#888";
+    const accent = css.getPropertyValue("--accent") || "#0aa";
+    const bad = css.getPropertyValue("--bad") || "#c33";
+    const border = css.getPropertyValue("--border") || "#ddd";
+    const pad = { l: 44, r: 12, t: 12, b: 26 };
+    const n = rows.length;
+    const cum = []; let t = 0;
+    rows.forEach((r) => { t += r.time; cum.push(t); });
+    const maxY = Math.max(S.total, t) * 1.02;
+    const X = (i) => pad.l + ((w - pad.l - pad.r) * i) / n;
+    const Y = (v) => h - pad.b - ((h - pad.t - pad.b) * v) / maxY;
+
+    c.strokeStyle = border; c.lineWidth = 1;
+    c.fillStyle = ink3; c.font = "11px ui-monospace, monospace";
+    for (let g = 0; g <= 4; g++) {
+      const v = (maxY / 4) * g;
+      c.beginPath(); c.moveTo(pad.l, Y(v)); c.lineTo(w - pad.r, Y(v)); c.stroke();
+      c.fillText(fmt(v), 6, Y(v) + 3);
+    }
+    // benchmark
+    c.strokeStyle = ink3; c.setLineDash([4, 4]); c.lineWidth = 1.5;
+    c.beginPath(); c.moveTo(X(0), Y(0)); c.lineTo(X(n), Y(S.total)); c.stroke();
+    c.setLineDash([]);
+    // actual
+    c.strokeStyle = accent; c.lineWidth = 2.5;
+    c.beginPath(); c.moveTo(X(0), Y(0));
+    cum.forEach((v, i) => c.lineTo(X(i + 1), Y(v)));
+    c.stroke();
+    rows.forEach(function (r, i) {
+      c.beginPath();
+      c.arc(X(i + 1), Y(cum[i]), 3.5, 0, Math.PI * 2);
+      c.fillStyle = r.correct ? accent : bad;
+      c.fill();
+    });
+    c.fillStyle = ink3;
+    c.fillText("Q1", X(1) - 8, h - 8);
+    c.fillText("Q" + n, X(n) - 14, h - 8);
+  }
+
+  function groupSection(title, rows, keyFn) {
+    const s = el("section", "block");
+    s.appendChild(el("h2", null, title));
+    const map = new Map();
+    rows.forEach(function (r) {
+      const k = keyFn(r);
+      if (!map.has(k)) map.set(k, { n: 0, c: 0, t: 0 });
+      const g = map.get(k);
+      g.n++; g.t += r.time; if (r.correct) g.c++;
+    });
+    const bars = el("div", "bars");
+    Array.from(map.entries())
+      .sort((a, b) => a[1].c / a[1].n - b[1].c / b[1].n)
+      .forEach(function ([k, g]) {
+        const row = el("div", "bar-row");
+        row.appendChild(el("div", null, k));
+        const track = el("div", "track");
+        const i = el("i");
+        const acc = g.c / g.n;
+        i.style.width = Math.max(acc * 100, 1.5) + "%";
+        i.style.background = acc >= 0.8 ? "var(--ok)" : acc >= 0.5 ? "var(--warn)" : "var(--bad)";
+        track.appendChild(i);
+        row.appendChild(track);
+        row.appendChild(el("div", "num", g.c + "/" + g.n + " · avg " + fmt(g.t / g.n)));
+        bars.appendChild(row);
+      });
+    s.appendChild(bars);
+    return s;
+  }
+
+  function userAnswerText(q, a) {
+    if (!hasAnswer(q, a)) return "—";
+    if (q.type === "twopart") return q.choices[a[0]] + " / " + q.choices[a[1]];
+    if (q.type === "multi") return a.map((i) => LETTERS[i]).join(", ");
+    return LETTERS[a];
+  }
+
+  function reviewSection(rows) {
+    const s = el("section", "block");
+    s.appendChild(el("h2", null, "Question-by-question review"));
+    const t = el("table", "review");
+    const thead = el("thead"), hr = el("tr");
+    ["#", "Topic", "Time", "You", "Key", "Diagnosis", ""].forEach((x) => hr.appendChild(el("th", null, x)));
+    thead.appendChild(hr); t.appendChild(thead);
+    const tb = el("tbody");
+    rows.forEach(function (r) {
+      const tr = el("tr");
+      tr.appendChild(el("td", "mono", String(r.pos)));
+      const tdTopic = el("td");
+      tdTopic.appendChild(document.createTextNode(r.q.topic));
+      tdTopic.appendChild(el("div", "num", r.q.diff));
+      tr.appendChild(tdTopic);
+      const tdT = el("td", "mono", fmt(r.time));
+      if (r.time > r.q.target * 1.15) tdT.style.color = "var(--warn)";
+      tdT.appendChild(el("div", "num", "target " + fmt(r.q.target)));
+      tr.appendChild(tdT);
+      tr.appendChild(el("td", "mono", userAnswerText(r.q, r.a)));
+      tr.appendChild(el("td", "mono", answerLabel(r.q)));
+      const tdD = el("td");
+      tdD.appendChild(el("span", "tag " + r.diag.cls, r.diag.tag));
+      tdD.appendChild(el("div", "num", r.diag.note));
+      tr.appendChild(tdD);
+      const tdW = el("td");
+      const det = el("details", "q-detail");
+      det.appendChild(el("summary", null, "Solution"));
+      det.appendChild(el("div", "why", r.q.stem));
+      det.appendChild(el("div", "why", r.q.why || ""));
+      tdW.appendChild(det);
+      tr.appendChild(tdW);
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    const scroll = el("div", "table-scroll");
+    scroll.appendChild(t);
+    s.appendChild(scroll);
+    return s;
+  }
+
+  function exportSection(rows) {
+    const s = el("section", "block");
+    s.appendChild(el("h2", null, "Error log export"));
+    s.appendChild(el("p", "why", "Tab-separated and ready to paste into the error-log workbook. Only missed and off-pace questions are included."));
+    const lines = ["Date\tSection\tSet\tQ#\tTopic\tDifficulty\tYour answer\tCorrect\tTime\tTarget\tError type\tTakeaway"];
+    const today = new Date().toISOString().slice(0, 10);
+    rows.filter((r) => !r.correct || r.time > r.q.target * 1.15).forEach(function (r) {
+      lines.push([today, S.set.section, S.set.title, r.pos, r.q.topic, r.q.diff,
+        userAnswerText(r.q, r.a), answerLabel(r.q), fmt(r.time), fmt(r.q.target),
+        r.diag.tag, (r.q.why || "").replace(/\s+/g, " ")].join("\t"));
+    });
+    const pre = el("pre", "export", lines.join("\n"));
+    s.appendChild(pre);
+    const btn = el("button", "btn", "Copy to clipboard");
+    btn.type = "button";
+    btn.style.marginTop = "var(--space-3)";
+    btn.addEventListener("click", function () {
+      const text = lines.join("\n");
+      const done = () => { btn.textContent = "Copied"; setTimeout(() => (btn.textContent = "Copy to clipboard"), 1600); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+      } else fallbackCopy(text, done);
+    });
+    s.appendChild(btn);
+    return s;
+  }
+
+  function fallbackCopy(text, done) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); done(); } catch (e) { /* ignore */ }
+    document.body.removeChild(ta);
+  }
+
+  /* ---------------- chrome wiring ---------------- */
+  function initTheme() {
+    const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    paintThemeIcon();
+    $("themeBtn").addEventListener("click", function () {
+      document.documentElement.dataset.theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      paintThemeIcon();
+    });
+  }
+  function paintThemeIcon() {
+    const d = document.documentElement.dataset.theme === "dark";
+    $("themeIcon").innerHTML = d
+      ? '<path d="M20 14.5A8.5 8.5 0 019.5 4a8.5 8.5 0 1010.5 10.5z" stroke-linecap="round"/>'
+      : '<circle cx="12" cy="12" r="4.5" /><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4" stroke-linecap="round" />';
+  }
+
+  window.bootSectionLab = function () {
+    window.__slReady = true;
+    initTheme();
+    renderSetGrid();
+    updateHint();
+    $("startBtn").addEventListener("click", startSection);
+    $("nextBtn").addEventListener("click", function () {
+      if (S.cur === S.order.length - 1) finish(false); else goTo(S.cur + 1);
+    });
+    $("prevBtn").addEventListener("click", () => goTo(S.cur - 1));
+    $("flagBtn").addEventListener("click", function () {
+      S.flags[curKey()] = !S.flags[curKey()];
+      renderQuestion();
+    });
+    $("submitBtn").addEventListener("click", function () {
+      const unanswered = S.order.filter((qi) => !hasAnswer(S.set.questions[qi], S.answers[qi])).length;
+      if (unanswered && !confirm(unanswered + " question(s) are still unanswered. Submit anyway?")) return;
+      finish(false);
+    });
+    $("pauseBtn").addEventListener("click", function () {
+      S.paused = !S.paused;
+      if (!S.paused) { S.lastStamp = performance.now(); S.qStamp = performance.now(); }
+      else bankTime();
+      $("pauseBtn").textContent = S.paused ? "Resume" : "Pause";
+    });
+    $("loadSetBtn").addEventListener("click", function () {
+      const raw = $("setJson").value.trim();
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        (Array.isArray(parsed) ? parsed : [parsed]).forEach((s) => window.registerSet(s));
+        $("loadMsg").textContent = "Added. It is now selectable above.";
+        $("setJson").value = "";
+      } catch (e) {
+        $("loadMsg").textContent = "Could not parse that JSON: " + e.message;
+      }
+    });
+    document.addEventListener("keydown", function (e) {
+      if ($("screenExam").classList.contains("hidden")) return;
+      const q = curQ();
+      if (/^[a-eA-E]$/.test(e.key) && q.type === "mcq") {
+        const i = LETTERS.indexOf(e.key.toUpperCase());
+        if (i > -1 && i < q.choices.length) { S.answers[curKey()] = i; renderQuestion(); if (S.reveal) showFeedback(q, curKey()); }
+      }
+      if (e.key === "ArrowRight" && S.cur < S.order.length - 1) goTo(S.cur + 1);
+      if (e.key === "ArrowLeft") goTo(S.cur - 1);
+      if (e.key.toLowerCase() === "f") { S.flags[curKey()] = !S.flags[curKey()]; renderQuestion(); }
+    });
+  };
+})();
