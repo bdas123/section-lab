@@ -6,6 +6,8 @@ A complete walkthrough, from opening the app to logging your errors. No setup, n
 
 Pick whichever is easiest:
 
+- **Use the live demo** — open [bdas123.github.io/section-lab](https://bdas123.github.io/section-lab/). Nothing to install; question sets stay in your browser.
+
 - **Download the repo** — click Code → Download ZIP on GitHub, unzip it, and double-click `index.html`. It runs straight from your file system, offline included.
 - **Clone it**
   ```bash

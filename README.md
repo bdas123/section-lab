@@ -2,6 +2,8 @@
 
 A browser-based timed section trainer for GMAT-style practice. Load a question set, run the section against a single countdown clock, and get a post-section report that tells you where the points actually went: content gaps, careless misses, or pacing.
 
+**[Try it live](https://bdas123.github.io/section-lab/)** — load a set from `example-sets/` and run a section.
+
 No accounts, no server, no tracking. One HTML file, one stylesheet, one script, and a bundled copy of KaTeX for math. Everything runs locally in the browser.
 
 ![Loading a question set](docs/screenshot-setup.png)
@@ -37,6 +39,8 @@ The review table diagnoses every question, and the pacing curve shows cumulative
 [HOW-TO-USE.md](HOW-TO-USE.md) is a step-by-step guide covering loading sets, the modes, reading the report, exporting an error log, and writing your own sets.
 
 ## Quick start
+
+Easiest path: open the [live demo](https://bdas123.github.io/section-lab/) and load one of the sample sets from `example-sets/`. To run it yourself:
 
 ```bash
 git clone https://github.com/bdas123/section-lab.git
