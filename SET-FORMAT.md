@@ -1,17 +1,19 @@
 # Question set format (Section Lab)
 
-Any section works — Quant, Verbal, Data Insights — as long as the set follows this shape. Add a file in `sets/` and a `<script>` tag in `index.html`, or paste the JSON into "Load a new question set" on the setup screen.
+No sets ship with the app. Any section works — Quant, Verbal, Data Insights — as long as the set follows this shape. On the setup screen, drop a `.json` file onto the loader (or pick it with Choose file), or paste the JSON and press Add set. A file may hold one set object or an array of sets. Two ready-made sets are in `example-sets/`.
 
-```js
-window.registerSet({
-  id: "verbal-01",
-  title: "Verbal Section 1 — CR Focus",
-  section: "Verbal Reasoning",
-  minutes: 45,                 // whole-section countdown
-  note: "Optional one-line description shown on the set card.",
-  questions: [ /* see below */ ]
-});
+```json
+{
+  "id": "verbal-01",
+  "title": "Verbal Section 1 — CR Focus",
+  "section": "Verbal Reasoning",
+  "minutes": 45,
+  "note": "Optional one-line description shown on the set card.",
+  "questions": [ ... ]
+}
 ```
+
+`minutes` is the whole-section countdown. Anything malformed is rejected on load with the reason, so a bad set never starts a timed section.
 
 ## Question fields
 

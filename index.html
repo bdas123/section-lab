@@ -40,8 +40,29 @@
   <div id="screenSetup">
     <div class="setup-head">
       <div class="eyebrow">Section trainer</div>
-      <h1>Pick a set, start the clock</h1>
-      <p>The clock runs like the real thing: one countdown for the whole section, per-question timing recorded in the background, no pausing unless you choose practice mode. When time expires or you submit, you get a full pacing and accuracy breakdown you can paste into your error log.</p>
+      <h1>Load a set, start the clock</h1>
+      <p>No sets are bundled. Drop in a question-set file or paste the JSON, and the timer, per-question tracking, and post-section analysis work the same for quant, verbal, or data insights. One countdown for the whole section, no pausing unless you choose practice mode.</p>
+    </div>
+
+    <div class="loader-panel" id="loaderPanel">
+      <div class="dropzone" id="dropzone">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M12 16V4m0 0L8 8m4-4l4 4" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" stroke-linecap="round" />
+        </svg>
+        <div class="dz-main">Drop a question-set file here</div>
+        <div class="dz-sub">.json files, one set or an array of sets</div>
+        <button class="btn" id="browseBtn" type="button">Choose file</button>
+        <input type="file" id="fileInput" accept=".json,application/json" multiple hidden />
+      </div>
+      <div class="paste-side">
+        <label class="eyebrow" for="setJson">Or paste JSON</label>
+        <textarea id="setJson" spellcheck="false" placeholder='{"title":"Verbal Section 1","section":"Verbal Reasoning","minutes":45,"questions":[{"topic":"Critical Reasoning","diff":"Medium","target":140,"stem":"...","choices":["A","B"],"answer":0,"why":"..."}]}'></textarea>
+        <div class="paste-row">
+          <button class="btn" id="loadSetBtn" type="button">Add set</button>
+          <span class="hint" id="loadMsg"></span>
+        </div>
+      </div>
     </div>
 
     <div class="set-grid" id="setGrid"></div>
@@ -58,12 +79,10 @@
     </div>
 
     <details class="loader">
-      <summary>Load a new question set (paste JSON)</summary>
-      <p class="hint" style="margin-top:var(--space-3);color:var(--ink-3);font-size:var(--text-xs)">Paste a set object in the documented format and it appears above. Sets I hand you in future sessions can be dropped in here or added as a file under <span class="mono">sets/</span>.</p>
-      <textarea id="setJson" spellcheck="false" placeholder='{"title":"Verbal Section 1","section":"Verbal Reasoning","minutes":45,"questions":[{"topic":"Critical Reasoning","diff":"Medium","target":140,"stem":"...","choices":["A","B"],"answer":0,"why":"..."}]}'></textarea>
-      <div style="margin-top:var(--space-3);display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap">
-        <button class="btn" id="loadSetBtn" type="button">Add set</button>
-        <span class="hint" id="loadMsg" style="font-size:var(--text-xs);color:var(--ink-3)"></span>
+      <summary>Set format reference</summary>
+      <div class="fmt">
+        <p>A set is one JSON object: <span class="mono">title</span>, <span class="mono">section</span>, <span class="mono">minutes</span>, and a <span class="mono">questions</span> array. Each question needs <span class="mono">stem</span>, <span class="mono">choices</span>, and either <span class="mono">answer</span> (single) or <span class="mono">answers</span> (multi-select and two-part).</p>
+        <p>Optional per question: <span class="mono">topic</span>, <span class="mono">diff</span>, <span class="mono">target</span> seconds, <span class="mono">why</span> for the review explanation, and <span class="mono">stimulus</span> for a passage or data table. Topic, difficulty, and target are what drive the pacing and error-log analysis, so keep them filled in.</p>
       </div>
     </details>
   </div>
@@ -98,8 +117,6 @@
 </main>
 
 <script src="app.js"></script>
-<script src="sets/quant-01.js"></script>
-<script src="sets/di-demo.js"></script>
 <script>window.bootSectionLab();</script>
 </body>
 </html>

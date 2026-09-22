@@ -9,11 +9,31 @@
   const LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
   window.registerSet = function (set) {
+    validateSet(set);
     const s = normalizeSet(set);
     SETS.push(s);
-    if (window.__slReady) renderSetGrid();
+    selectedSetId = s.id;
+    if (window.__slReady) { renderSetGrid(); updateHint(); }
     return s;
   };
+
+  function validateSet(set) {
+    if (!set || typeof set !== "object" || Array.isArray(set)) throw new Error("a set must be a JSON object");
+    if (!Array.isArray(set.questions) || !set.questions.length) throw new Error("no questions array found");
+    set.questions.forEach(function (q, i) {
+      const at = "question " + (i + 1);
+      if (!q || typeof q !== "object") throw new Error(at + " is not an object");
+      if (typeof q.stem !== "string" || !q.stem.trim()) throw new Error(at + " has no stem");
+      if (!Array.isArray(q.choices) || q.choices.length < 2) throw new Error(at + " needs at least two choices");
+      const type = q.type || (Array.isArray(q.answers) ? (q.twoPartHeaders ? "twopart" : "multi") : "mcq");
+      const inRange = (v) => Number.isInteger(v) && v >= 0 && v < q.choices.length;
+      if (type === "mcq" && !inRange(q.answer)) throw new Error(at + " needs an 'answer' index within its choices");
+      if (type !== "mcq") {
+        if (!Array.isArray(q.answers) || !q.answers.length || !q.answers.every(inRange)) throw new Error(at + " needs an 'answers' array of valid choice indexes");
+        if (type === "twopart" && (!Array.isArray(q.twoPartHeaders) || q.twoPartHeaders.length !== 2 || q.answers.length !== 2)) throw new Error(at + " (two-part) needs two column headers and two answers");
+      }
+    });
+  }
 
   function normalizeSet(raw) {
     const set = Object.assign({}, raw);
@@ -56,9 +76,11 @@
   function renderSetGrid() {
     const grid = $("setGrid");
     grid.innerHTML = "";
+    $("startBtn").disabled = !SETS.length;
     if (!SETS.length) {
-      const empty = el("div", "card");
-      empty.appendChild(el("p", null, "No question sets loaded yet. Paste one below to get started."));
+      const empty = el("div", "card empty-state");
+      empty.appendChild(el("div", "eyebrow", "No sets loaded"));
+      empty.appendChild(el("p", null, "Nothing is timed until a set is loaded. Add a file or paste JSON above and it will appear here, ready to start."));
       grid.appendChild(empty);
       return;
     }
@@ -76,11 +98,38 @@
       b.appendChild(meta);
       if (set.note) b.appendChild(el("p", "note", set.note));
       b.addEventListener("click", function () { selectedSetId = set.id; renderSetGrid(); updateHint(); });
-      grid.appendChild(b);
+      const rm = el("button", "remove-set", "Remove");
+      rm.type = "button";
+      rm.addEventListener("click", function (e) {
+        e.stopPropagation();
+        const i = SETS.findIndex((s) => s.id === set.id);
+        if (i > -1) SETS.splice(i, 1);
+        renderSetGrid(); updateHint();
+      });
+      const slot = el("div", "set-slot");
+      slot.appendChild(b);
+      slot.appendChild(rm);
+      grid.appendChild(slot);
     });
   }
 
   function currentSet() { return SETS.find((s) => s.id === selectedSetId) || SETS[0]; }
+
+  function addSetsFromText(text, label) {
+    const parsed = JSON.parse(text);
+    const list = Array.isArray(parsed) ? parsed : [parsed];
+    list.forEach(function (s) {
+      try { window.registerSet(s); }
+      catch (e) { throw new Error((label ? label + " — " : "") + e.message); }
+    });
+    return list.length;
+  }
+
+  function loadMsg(text, bad) {
+    const n = $("loadMsg");
+    n.textContent = text;
+    n.style.color = bad ? "var(--bad)" : "var(--ok)";
+  }
 
   function updateHint() {
     const set = currentSet();
@@ -673,16 +722,51 @@
     });
     $("loadSetBtn").addEventListener("click", function () {
       const raw = $("setJson").value.trim();
-      if (!raw) return;
+      if (!raw) { loadMsg("Paste a set first.", true); return; }
       try {
-        const parsed = JSON.parse(raw);
-        (Array.isArray(parsed) ? parsed : [parsed]).forEach((s) => window.registerSet(s));
-        $("loadMsg").textContent = "Added. It is now selectable above.";
+        const n = addSetsFromText(raw);
+        loadMsg(n === 1 ? "Set added and selected." : n + " sets added.", false);
         $("setJson").value = "";
       } catch (e) {
-        $("loadMsg").textContent = "Could not parse that JSON: " + e.message;
+        loadMsg("Could not load that: " + e.message, true);
       }
     });
+
+    const fileInput = $("fileInput");
+    const dz = $("dropzone");
+    $("browseBtn").addEventListener("click", () => fileInput.click());
+    dz.addEventListener("click", function (e) { if (e.target === dz || e.target.closest(".dz-main, .dz-sub, svg")) fileInput.click(); });
+    fileInput.addEventListener("change", function () { readFiles(fileInput.files); fileInput.value = ""; });
+    ["dragenter", "dragover"].forEach((ev) => dz.addEventListener(ev, function (e) { e.preventDefault(); dz.dataset.active = "true"; }));
+    ["dragleave", "drop"].forEach((ev) => dz.addEventListener(ev, function (e) { e.preventDefault(); dz.dataset.active = "false"; }));
+    dz.addEventListener("drop", function (e) {
+      if (e.dataTransfer) readFiles(e.dataTransfer.files);
+    });
+
+    function readFiles(files) {
+      const list = Array.from(files || []);
+      if (!list.length) return;
+      let added = 0;
+      let pending = list.length;
+      const problems = [];
+      list.forEach(function (f) {
+        const reader = new FileReader();
+        reader.onload = function () {
+          try { added += addSetsFromText(String(reader.result), f.name); }
+          catch (err) { problems.push(err.message); }
+          if (--pending === 0) report();
+        };
+        reader.onerror = function () {
+          problems.push(f.name + " could not be read");
+          if (--pending === 0) report();
+        };
+        reader.readAsText(f);
+      });
+      function report() {
+        if (problems.length) loadMsg(problems.join(" · "), true);
+        else loadMsg(added === 1 ? "Set added and selected." : added + " sets added.", false);
+      }
+    }
     document.addEventListener("keydown", function (e) {
       if ($("screenExam").classList.contains("hidden")) return;
       const q = curQ();
