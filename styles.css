@@ -281,6 +281,16 @@ table.review th { font-size: var(--text-xs); text-transform: uppercase; letter-s
 .q-detail summary { cursor: pointer; color: var(--accent); font-size: var(--text-sm); }
 .q-detail[open] summary { margin-bottom: var(--space-2); }
 
+.export-tabs { display: flex; gap: var(--space-2); margin-bottom: var(--space-3); }
+.tab {
+  font-size: var(--text-xs); padding: var(--space-2) var(--space-3);
+  border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--ink-2);
+}
+.tab[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.export-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-3); }
+.export-actions .hint { font-size: var(--text-xs); }
+
 pre.export {
   background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
   padding: var(--space-4); overflow: auto; font-family: "JetBrains Mono", monospace;

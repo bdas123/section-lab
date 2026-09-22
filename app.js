@@ -446,7 +446,7 @@
     root.appendChild(groupSection("Accuracy by topic", rows, (r) => r.q.topic));
     root.appendChild(groupSection("Accuracy by difficulty", rows, (r) => r.q.diff));
     root.appendChild(reviewSection(rows));
-    root.appendChild(exportSection(rows));
+    root.appendChild(exportSection(rows, { correct: correct, n: n, pct: pct, used: used, blanks: blanks, careless: careless, overTarget: overTarget, est: est, expired: !!expired }));
 
     const again = el("div");
     again.style.display = "flex";
@@ -642,31 +642,147 @@
     return s;
   }
 
-  function exportSection(rows) {
+  function localDate() {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  function buildLogObject(rows, sum) {
+    const flagged = rows.filter((r) => !r.correct || r.time > r.q.target * 1.15);
+    return {
+      exportedAt: new Date().toISOString(),
+      date: localDate(),
+      section: S.set.section,
+      set: S.set.title,
+      setId: S.set.id,
+      sectionMinutes: S.set.minutes,
+      timeExpired: sum.expired,
+      summary: {
+        questions: sum.n,
+        correct: sum.correct,
+        accuracyPercent: sum.pct,
+        estimatedBand: (sum.est - 2) + "-" + (sum.est + 2),
+        secondsUsed: Math.round(sum.used),
+        secondsAvailable: S.total,
+        avgSecondsPerQuestion: Math.round(sum.used / sum.n),
+        targetSecondsPerQuestion: Math.round(S.total / sum.n),
+        unanswered: sum.blanks,
+        carelessMisses: sum.careless,
+        overTargetCount: sum.overTarget
+      },
+      topicBreakdown: Array.from(rows.reduce(function (m, r) {
+        const g = m.get(r.q.topic) || { topic: r.q.topic, attempted: 0, correct: 0, totalSeconds: 0 };
+        g.attempted++; g.totalSeconds += r.time; if (r.correct) g.correct++;
+        m.set(r.q.topic, g);
+        return m;
+      }, new Map()).values()).map(function (g) {
+        return { topic: g.topic, attempted: g.attempted, correct: g.correct, avgSeconds: Math.round(g.totalSeconds / g.attempted) };
+      }).sort((a, b) => a.correct / a.attempted - b.correct / b.attempted),
+      errorLog: flagged.map(function (r) {
+        return {
+          question: r.pos,
+          topic: r.q.topic,
+          difficulty: r.q.diff,
+          type: r.q.type,
+          yourAnswer: hasAnswer(r.q, r.a) ? userAnswerText(r.q, r.a) : null,
+          correctAnswer: answerLabel(r.q),
+          wasCorrect: r.correct,
+          seconds: Math.round(r.time),
+          targetSeconds: r.q.target,
+          secondsOverTarget: Math.round(r.time - r.q.target),
+          errorType: r.diag.tag,
+          diagnosis: r.diag.note,
+          stem: r.q.stem,
+          takeaway: (r.q.why || "").replace(/\s+/g, " ")
+        };
+      })
+    };
+  }
+
+  function exportSection(rows, sum) {
     const s = el("section", "block");
     s.appendChild(el("h2", null, "Error log export"));
-    s.appendChild(el("p", "why", "Tab-separated and ready to paste into the error-log workbook. Only missed and off-pace questions are included."));
+    s.appendChild(el("p", "why", "Download the JSON file to hand back for error-log updates, or copy the tab-separated version straight into the workbook. Both cover every missed or off-pace question."));
     const lines = ["Date\tSection\tSet\tQ#\tTopic\tDifficulty\tYour answer\tCorrect\tTime\tTarget\tError type\tTakeaway"];
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDate();
     rows.filter((r) => !r.correct || r.time > r.q.target * 1.15).forEach(function (r) {
       lines.push([today, S.set.section, S.set.title, r.pos, r.q.topic, r.q.diff,
         userAnswerText(r.q, r.a), answerLabel(r.q), fmt(r.time), fmt(r.q.target),
         r.diag.tag, (r.q.why || "").replace(/\s+/g, " ")].join("\t"));
     });
-    const pre = el("pre", "export", lines.join("\n"));
-    s.appendChild(pre);
-    const btn = el("button", "btn", "Copy to clipboard");
-    btn.type = "button";
-    btn.style.marginTop = "var(--space-3)";
-    btn.addEventListener("click", function () {
-      const text = lines.join("\n");
-      const done = () => { btn.textContent = "Copied"; setTimeout(() => (btn.textContent = "Copy to clipboard"), 1600); };
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
-      } else fallbackCopy(text, done);
+    const logObj = buildLogObject(rows, sum);
+    const jsonText = JSON.stringify(logObj, null, 2);
+    const slug = (S.set.title || "section").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const fileName = logObj.date + "-" + slug + "-error-log.json";
+
+    const tabs = el("div", "export-tabs");
+    const jsonPre = el("pre", "export", jsonText);
+    const tsvPre = el("pre", "export hidden", lines.join("\n"));
+    const mkTab = (label, on) => {
+      const b = el("button", "tab", label);
+      b.type = "button";
+      b.addEventListener("click", function () {
+        jsonPre.classList.toggle("hidden", !on);
+        tsvPre.classList.toggle("hidden", on);
+        Array.from(tabs.children).forEach((c) => c.setAttribute("aria-pressed", String(c === b)));
+      });
+      return b;
+    };
+    const tJson = mkTab("JSON", true), tTsv = mkTab("Tab-separated", false);
+    tJson.setAttribute("aria-pressed", "true");
+    tTsv.setAttribute("aria-pressed", "false");
+    tabs.appendChild(tJson); tabs.appendChild(tTsv);
+    s.appendChild(tabs);
+    s.appendChild(jsonPre);
+    s.appendChild(tsvPre);
+
+    const row = el("div", "export-actions");
+
+    const dl = el("button", "btn btn-primary", "Download JSON");
+    dl.type = "button";
+    dl.addEventListener("click", function () {
+      try {
+        const blob = new Blob([jsonText], { type: "application/json" });
+        const href = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = href;
+        a.download = fileName;
+        a.rel = "noopener";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(href), 4000);
+        note("Saved as " + fileName);
+      } catch (e) {
+        note("Download blocked here — use Copy JSON instead.", true);
+      }
     });
-    s.appendChild(btn);
+
+    const cpJson = el("button", "btn", "Copy JSON");
+    cpJson.type = "button";
+    cpJson.addEventListener("click", () => copyText(jsonText, cpJson, "Copy JSON"));
+
+    const cpTsv = el("button", "btn", "Copy tab-separated");
+    cpTsv.type = "button";
+    cpTsv.addEventListener("click", () => copyText(lines.join("\n"), cpTsv, "Copy tab-separated"));
+
+    const msg = el("span", "hint");
+    function note(text, bad) {
+      msg.textContent = text;
+      msg.style.color = bad ? "var(--bad)" : "var(--ok)";
+    }
+
+    row.appendChild(dl); row.appendChild(cpJson); row.appendChild(cpTsv); row.appendChild(msg);
+    s.appendChild(row);
+    s.appendChild(el("p", "why", "The JSON file carries the section summary, topic breakdown, and one entry per flagged question — attach it in chat and the error log can be updated from it directly."));
     return s;
+  }
+
+  function copyText(text, btn, label) {
+    const done = () => { btn.textContent = "Copied"; setTimeout(() => (btn.textContent = label), 1600); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+    } else fallbackCopy(text, done);
   }
 
   function fallbackCopy(text, done) {
