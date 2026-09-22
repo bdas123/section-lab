@@ -52,7 +52,7 @@ Any static host works too — GitHub Pages, Netlify, an S3 bucket, or `python3 -
 
 Then:
 
-1. Drag a set file onto the dropzone, or click **Choose file**, or paste JSON into the box and press **Add set**. Nothing ships bundled — the app starts empty on purpose. Start with `example-sets/quant-01.json`.
+1. Click one of the **Load a sample** links (quant section, Data Insights, or LaTeX demo), or bring your own: drag a set file onto the dropzone, click **Choose file**, or paste JSON and press **Add set**. Nothing ships bundled — the app starts empty on purpose. The sample links fetch from `example-sets/`, so they need the app served over http; opening `index.html` directly still works with Choose file.
 2. Pick the set card you want, choose any options (shuffle, practice mode, reveal answers), and press **Start section**.
 3. Work the section. The clock does not stop unless practice mode is on.
 4. Read the report, then download the JSON error log.

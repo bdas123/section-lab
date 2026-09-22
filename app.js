@@ -872,6 +872,29 @@
       }
     });
 
+    Array.from(document.querySelectorAll("[data-sample]")).forEach(function (b) {
+      b.addEventListener("click", function () {
+        const path = b.dataset.sample;
+        const label = b.textContent.split("\u00b7")[0].trim();
+        b.disabled = true;
+        loadMsg("Loading " + label + "\u2026", false);
+        fetch(path)
+          .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+          .then(function (text) {
+            const n = addSetsFromText(text, path);
+            loadMsg(label + " loaded and selected.", false);
+            return n;
+          })
+          .catch(function (e) {
+            const local = location.protocol === "file:";
+            loadMsg(local
+              ? "Samples need a web server \u2014 open the file with Choose file instead."
+              : "Could not fetch that sample (" + e.message + "). Use Choose file instead.", true);
+          })
+          .then(function () { b.disabled = false; });
+      });
+    });
+
     const fileInput = $("fileInput");
     const dz = $("dropzone");
     $("browseBtn").addEventListener("click", () => fileInput.click());

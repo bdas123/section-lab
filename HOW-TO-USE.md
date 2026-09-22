@@ -23,6 +23,7 @@ Everything happens in your browser. Nothing is uploaded and nothing is stored on
 
 The app starts empty by design — you bring the questions. Three ways to load a set:
 
+0. **Load a sample** — click one of the sample links under the paste box (Quant section, Data Insights, or LaTeX demo). This is the fastest way to see the app work, and it needs the app to be served over http, so it works on the live demo but not from a double-clicked local file.
 1. **Drag and drop** a `.json` file onto the dashed panel.
 2. **Choose file** to pick one or several files at once.
 3. **Paste JSON** into the box on the right and press Add set.
