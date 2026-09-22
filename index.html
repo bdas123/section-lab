@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Section Lab — timed GMAT section trainer</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='17' r='11' fill='none' stroke='%23127f8c' stroke-width='3'/%3E%3Cpath d='M16 17V10' stroke='%23127f8c' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="vendor/katex/katex.min.css" />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -83,6 +84,7 @@
       <div class="fmt">
         <p>A set is one JSON object: <span class="mono">title</span>, <span class="mono">section</span>, <span class="mono">minutes</span>, and a <span class="mono">questions</span> array. Each question needs <span class="mono">stem</span>, <span class="mono">choices</span>, and either <span class="mono">answer</span> (single) or <span class="mono">answers</span> (multi-select and two-part).</p>
         <p>Optional per question: <span class="mono">topic</span>, <span class="mono">diff</span>, <span class="mono">target</span> seconds, <span class="mono">why</span> for the review explanation, and <span class="mono">stimulus</span> for a passage or data table. Topic, difficulty, and target are what drive the pacing and error-log analysis, so keep them filled in.</p>
+        <p><strong>LaTeX is supported</strong> anywhere text appears — stems, choices, passages, table cells, two-part headers, and explanations. Use <span class="mono">$ ... $</span> or <span class="mono">\( ... \)</span> for inline math and <span class="mono">$$ ... $$</span> or <span class="mono">\[ ... \]</span> for a display block. Inside a JSON file every backslash must be doubled, so <span class="mono">\frac{3}{4}</span> is written <span class="mono">"$\\frac{3}{4}$"</span>. Broken math is left as plain red text rather than breaking the question.</p>
       </div>
     </details>
   </div>
@@ -116,6 +118,8 @@
   <div id="screenReport" class="hidden"></div>
 </main>
 
+<script src="vendor/katex/katex.min.js"></script>
+<script src="vendor/katex/auto-render.min.js"></script>
 <script src="app.js"></script>
 <script>window.bootSectionLab();</script>
 </body>

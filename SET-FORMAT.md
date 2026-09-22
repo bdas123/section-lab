@@ -34,3 +34,16 @@ No sets ship with the app. Any section works â€” Quant, Verbal, Data Insights â€
 ## Diagnosis rules
 
 Each question is tagged automatically from accuracy plus time against its target: Clean, Slow solve (>15% over), Time sink (>50% over), Careless (wrong in under half the target), Content gap, Content gap + sink, Unanswered. Those tags are what feed the error-log export.
+
+## LaTeX
+
+Math is rendered with KaTeX (bundled in `vendor/katex/`, so it works offline). Every text field accepts LaTeX: `stem`, `choices`, `why`, `twoPartHeaders`, `stimulus.text`, and `stimulus.table` headers and cells.
+
+| Delimiter | Mode |
+| --- | --- |
+| `$ ... $` | inline |
+| `\( ... \)` | inline |
+| `$$ ... $$` | display block |
+| `\[ ... \]` | display block |
+
+Because sets are JSON, backslashes must be escaped: write `"$\\frac{3}{4}$"` to get \(\frac{3}{4}\), and `"$\\sqrt{x^3}$"` for a root. Literal dollar amounts inside math should use `\\$`, or keep them outside the math delimiters. Malformed expressions render in red as plain text instead of breaking the section, so a typo never blocks a timed run.

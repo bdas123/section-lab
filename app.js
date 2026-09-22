@@ -64,6 +64,24 @@
 
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n; };
+  function typeset(node) {
+    if (!node || typeof window.renderMathInElement !== "function") return;
+    try {
+      window.renderMathInElement(node, {
+        delimiters: [
+          { left: "$$", right: "$$", display: true },
+          { left: "\\[", right: "\\]", display: true },
+          { left: "\\(", right: "\\)", display: false },
+          { left: "$", right: "$", display: false }
+        ],
+        ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option"],
+        ignoredClasses: ["export", "no-math"],
+        throwOnError: false,
+        errorColor: "#b4453c"
+      });
+    } catch (e) { /* malformed math stays as plain text */ }
+  }
+
   const fmt = (sec) => {
     sec = Math.max(0, Math.round(sec));
     const m = Math.floor(sec / 60);
@@ -76,6 +94,7 @@
   function renderSetGrid() {
     const grid = $("setGrid");
     grid.innerHTML = "";
+    setTimeout(() => typeset(grid), 0);
     $("startBtn").disabled = !SETS.length;
     if (!SETS.length) {
       const empty = el("div", "card empty-state");
@@ -252,6 +271,9 @@
     if (q.type === "twopart") body.appendChild(buildTwoPart(q, k));
     else body.appendChild(buildChoices(q, k));
 
+    typeset(stim);
+    typeset($("qStem"));
+    typeset(body);
     renderPalette();
     paintTimer();
     if (S.reveal && S.answers[k] !== undefined) showFeedback(q, k);
@@ -332,6 +354,7 @@
     d.appendChild(el("div", "eyebrow", good ? "Correct" : "Incorrect — correct answer: " + answerLabel(q)));
     d.appendChild(el("p", "why", q.why || ""));
     box.appendChild(d);
+    typeset(box);
   }
 
   function answerLabel(q) {
@@ -465,6 +488,7 @@
     retry.addEventListener("click", function () { $("screenReport").classList.add("hidden"); startSection(); });
     again.appendChild(back); again.appendChild(retry);
     root.appendChild(again);
+    typeset(root);
   }
 
   function bandSection(rows) {
