@@ -1,0 +1,89 @@
+{
+  "id": "rc-demo",
+  "title": "Reading Comprehension Demo",
+  "section": "Verbal Reasoning",
+  "minutes": 7,
+  "note": "One three-paragraph passage shared by three questions, plus a two-paragraph Critical Reasoning argument. On wide screens long passages sit beside the question, as on the real exam.",
+  "passages": {
+    "coral": {
+      "title": "Passage",
+      "text": [
+        "For most of the twentieth century, marine biologists treated coral bleaching as a straightforward symptom of stress: when water temperatures rose, corals expelled the symbiotic algae that supply most of their energy, turned white, and, if conditions did not improve, starved. Under this view, a reef's survival depended almost entirely on how long a heat wave lasted.",
+        "Research over the past two decades has complicated that picture. Some colonies that bleach **recover within weeks**, while neighboring colonies of the same species, exposed to identical temperatures, die. One explanation is that corals can host several strains of algae, and certain strains tolerate heat far better than others. A coral that shifts toward a heat-tolerant strain after bleaching may survive the next warm season with little damage — a process some researchers call *symbiont shuffling*.",
+        "The finding has encouraged proposals to seed threatened reefs with heat-tolerant algae. Critics caution, however, that the tolerant strains often supply their hosts with less energy, so corals that rely on them may grow more slowly and reproduce less. A reef that survives by this route, they argue, may persist in a diminished form rather than truly recover."
+      ]
+    }
+  },
+  "questions": [
+    {
+      "id": 1,
+      "topic": "RC · Main idea",
+      "diff": "Medium",
+      "target": 110,
+      "passage": "coral",
+      "stem": "The primary purpose of the passage is to",
+      "choices": [
+        "argue that coral bleaching is less harmful than biologists once believed",
+        "describe a refinement of an earlier understanding of coral bleaching and note a reservation about a proposal it inspired",
+        "compare two competing explanations for why corals expel their symbiotic algae",
+        "advocate seeding threatened reefs with heat-tolerant strains of algae",
+        "explain why rising water temperatures cause corals to starve"
+      ],
+      "answer": 1,
+      "why": "Paragraph 1 gives the older view, paragraph 2 refines it (symbiont shuffling), and paragraph 3 reports a proposal and the critics' reservation.\n\n(A) overstates the passage's claim, and (D) takes a side the author never takes."
+    },
+    {
+      "id": 2,
+      "topic": "RC · Detail",
+      "diff": "Medium",
+      "target": 90,
+      "passage": "coral",
+      "stem": "According to the passage, the critics mentioned in the third paragraph are concerned that corals relying on heat-tolerant algae may",
+      "choices": [
+        "bleach more frequently than other corals",
+        "be unable to shift back to their original algae",
+        "receive less energy and therefore grow and reproduce less",
+        "spread heat-tolerant algae to neighboring reefs",
+        "die within weeks of a heat wave"
+      ],
+      "answer": 2,
+      "why": "The third paragraph says tolerant strains \"often supply their hosts with less energy,\" so such corals \"may grow more slowly and reproduce less.\""
+    },
+    {
+      "id": 3,
+      "topic": "RC · Inference",
+      "diff": "Hard",
+      "target": 120,
+      "passage": "coral",
+      "stem": "The passage suggests which of the following about two colonies of the same species exposed to identical temperatures, one of which survives bleaching and one of which dies?\n\nSelect the best answer.",
+      "choices": [
+        "The surviving colony was exposed to the heat for a shorter period.",
+        "The surviving colony may have hosted, or shifted toward, a more heat-tolerant strain of algae.",
+        "The colony that died had already expelled all of its algae before the heat wave.",
+        "The surviving colony will grow faster than the colony that died would have.",
+        "Temperature plays no role in whether a colony survives bleaching."
+      ],
+      "answer": 1,
+      "why": "The passage offers symbiont shuffling as \"one explanation\" for why identically exposed colonies differ. (A) contradicts \"identical temperatures\"; (D) runs against the critics' point about slower growth."
+    },
+    {
+      "id": 4,
+      "topic": "CR · Weaken",
+      "diff": "Medium",
+      "target": 120,
+      "stimulus": {
+        "text": "Last year the town of Millbrook replaced its streetlights with brighter LED fixtures. In the twelve months since, reported car break-ins in the town center have fallen by 30 percent.\n\nThe town council concludes that the brighter lighting deterred would-be thieves and plans to install the same fixtures in the town's residential neighborhoods."
+      },
+      "stem": "Which of the following, if true, most seriously weakens the council's conclusion?",
+      "choices": [
+        "The LED fixtures use less electricity than the fixtures they replaced.",
+        "Residents of the neighborhoods have asked for brighter lighting.",
+        "During the same twelve months, the town began stationing a police patrol in the town center each night.",
+        "Car break-ins in neighboring towns were roughly unchanged over the same period.",
+        "Some residents find the new lighting too harsh."
+      ],
+      "answer": 2,
+      "why": "A new nightly patrol is an alternative cause for the drop, so the lighting may not be responsible.\n\n(D) actually strengthens the conclusion by ruling out a region-wide trend."
+    }
+  ]
+}

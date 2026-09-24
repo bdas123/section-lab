@@ -29,6 +29,7 @@ The review table diagnoses every question, and the pacing curve shows cumulative
 - **Question types.** Multiple choice, multi-select ("select all that apply"), and two-part analysis, with optional passage or data-table stimulus.
 - **LaTeX rendering.** Math anywhere in a set — stems, choices, passages, table cells, explanations.
 - **Bold, italics, underline.** `**bold**`, `\textbf{}`, `\emph{}`, `\underline{}` in any text field — enough for Critical Reasoning boldface questions.
+- **Reading comprehension.** Multi-paragraph passages defined once and shared across questions, shown beside the question on wide screens.
 - **Flags, palette, keyboard shortcuts.** `A`–`E` to answer, arrows to move, `F` to flag.
 - **Post-section report.** Accuracy, rough score band, pacing curve against an even-pace benchmark, accuracy by topic and difficulty, a per-question review table with diagnosis, and collapsible solutions.
 - **Error log export.** Download the flagged questions as JSON, or copy a tab-separated block that pastes straight into a spreadsheet error log.
@@ -53,12 +54,12 @@ Any static host works too — GitHub Pages, Netlify, an S3 bucket, or `python3 -
 
 Then:
 
-1. Click one of the **Load a sample** links (quant section, Data Insights, LaTeX demo, or boldface CR), or bring your own: drag a set file onto the dropzone, click **Choose file**, or paste JSON and press **Add set**. Nothing ships bundled — the app starts empty on purpose. The sample links fetch from `example-sets/`, so they need the app served over http; opening `index.html` directly still works with Choose file.
+1. Click one of the **Load a sample** links (quant section, Data Insights, LaTeX demo, boldface CR, or reading comp), or bring your own: drag a set file onto the dropzone, click **Choose file**, or paste JSON and press **Add set**. Nothing ships bundled — the app starts empty on purpose. The sample links fetch from `example-sets/`, so they need the app served over http; opening `index.html` directly still works with Choose file.
 2. Pick the set card you want, choose any options (shuffle, practice mode, reveal answers), and press **Start section**.
 3. Work the section. The clock does not stop unless practice mode is on.
 4. Read the report, then download the JSON error log.
 
-`example-sets/` contains four ready-to-load files: a 21-question quant section, a short Data Insights demo exercising every question type, a LaTeX smoke test, and a boldface Critical Reasoning demo.
+`example-sets/` contains five ready-to-load files: a 21-question quant section, a short Data Insights demo exercising every question type, a LaTeX smoke test, a boldface Critical Reasoning demo, and a reading comprehension demo with a shared multi-paragraph passage.
 
 ## Writing your own sets
 

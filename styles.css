@@ -330,3 +330,35 @@ pre.export {
 .linklike + .linklike { margin-left: var(--space-2); }
 .linklike:disabled { opacity: 0.5; cursor: default; }
 .samples, .samples .hint { font-size: var(--text-xs); }
+
+/* ---------- multi-paragraph text & reading-comprehension layout ---------- */
+.prose p { margin: 0 0 0.85em; white-space: pre-line; }
+.prose p:last-child { margin-bottom: 0; }
+.stimulus .prose p { text-indent: 0; }
+.stimulus .prose + table.data { margin-top: var(--space-4); }
+.stim-title { margin-bottom: var(--space-3); }
+.stem .prose p { margin-bottom: 0.6em; }
+.why.prose p { margin-bottom: 0.6em; }
+
+@media (min-width: 960px) {
+  .exam-card.split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    column-gap: var(--space-8);
+    align-items: start;
+  }
+  .exam-card.split > .qhead,
+  .exam-card.split > .navrow,
+  .exam-card.split > .palette { grid-column: 1 / -1; }
+  .exam-card.split > #qStimulus { grid-column: 1; }
+  .exam-card.split > .qmain { grid-column: 2; }
+  .exam-card.split .stimulus {
+    margin-bottom: 0;
+    max-height: calc(100vh - 230px);
+    min-height: 240px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    line-height: 1.65;
+  }
+  .exam-card.split .stimulus .prose p { margin-bottom: 1em; }
+}

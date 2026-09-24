@@ -28,7 +28,8 @@ No sets ship with the app. Any section works — Quant, Verbal, Data Insights �
 | `diff` | recommended | `Easy` / `Medium` / `Hard` |
 | `target` | no | Target seconds; defaults to section time ÷ question count |
 | `why` | recommended | Explanation shown in review and pushed to the error-log export |
-| `stimulus` | no | `{ text: "...", table: { headers: [...], rows: [[...]] } }` — reading passage, prompt, or data table |
+| `stimulus` | no | `{ title?, text: "..." or ["para 1", "para 2"], table?: { headers: [...], rows: [[...]] }, layout?: "split" \| "stacked" }` — reading passage, argument, or data table |
+| `passage` | no | name of a shared passage in the set's top-level `passages` object (see Multiple paragraphs) |
 | `twoPartHeaders` | twopart | `["Column A label", "Column B label"]` |
 
 ## Diagnosis rules
@@ -65,3 +66,32 @@ Every text field that accepts LaTeX also accepts inline formatting:
 - Unclosed markers (a lone `**` or a `\\textbf{` with no closing brace) are left as plain text rather than bolding the rest of the question.
 - Critical Reasoning boldface questions: put the argument in `stimulus.text` with the two portions wrapped in `**...**`, and ask about their roles in `stem`. See `example-sets/boldface-demo.json`.
 - The exported error log keeps the raw markers, so a stem round-trips unchanged.
+
+## Multiple paragraphs and shared passages
+
+`stimulus.text`, `stem`, and `why` can hold several paragraphs:
+
+- Separate paragraphs with a blank line: `"First paragraph.\n\nSecond paragraph."`
+- Or pass an array of strings, one per paragraph: `"text": ["First paragraph.", "Second paragraph."]`
+- A single `\n` inside a paragraph is a line break (useful for dialogue-style CR arguments).
+
+Reading comprehension sets usually ask 3–4 questions about one passage. Instead of repeating it, define it once at the top level and reference it by name:
+
+```json
+{
+  "title": "RC Drill 1",
+  "section": "Verbal Reasoning",
+  "minutes": 7,
+  "passages": {
+    "coral": { "title": "Passage", "text": ["Paragraph one...", "Paragraph two...", "Paragraph three..."] }
+  },
+  "questions": [
+    { "passage": "coral", "topic": "RC · Main idea", "stem": "The primary purpose of the passage is to", "choices": ["..."], "answer": 1, "why": "..." },
+    { "passage": "coral", "topic": "RC · Detail", "stem": "According to the passage, ...", "choices": ["..."], "answer": 2, "why": "..." }
+  ]
+}
+```
+
+A passage entry can also be a plain string or array. Anything in a question's own `stimulus` overrides the shared passage's fields.
+
+**Layout.** When a stimulus has two or more paragraphs (or runs past about 900 characters) and no table, it sits in a scrollable column beside the question on screens 960px and wider, like the real exam; on narrow screens it stacks above. Set `"layout": "split"` or `"layout": "stacked"` on the stimulus to override. See `example-sets/rc-demo.json`.

@@ -20,10 +20,14 @@
   function validateSet(set) {
     if (!set || typeof set !== "object" || Array.isArray(set)) throw new Error("a set must be a JSON object");
     if (!Array.isArray(set.questions) || !set.questions.length) throw new Error("no questions array found");
+    if (set.passages != null && (typeof set.passages !== "object" || Array.isArray(set.passages))) throw new Error("'passages' must be an object of named passages");
     set.questions.forEach(function (q, i) {
       const at = "question " + (i + 1);
       if (!q || typeof q !== "object") throw new Error(at + " is not an object");
-      if (typeof q.stem !== "string" || !q.stem.trim()) throw new Error(at + " has no stem");
+      if (q.passage != null && !(set.passages && set.passages[q.passage])) throw new Error(at + " refers to passage '" + q.passage + "', which is not defined in 'passages'");
+      const okText = (v) => (typeof v === "string" && v.trim()) || (Array.isArray(v) && v.length && v.every((x) => typeof x === "string"));
+      if (!okText(q.stem)) throw new Error(at + " has no stem");
+      if (q.stimulus && q.stimulus.text != null && !okText(q.stimulus.text)) throw new Error(at + " has a stimulus.text that is not a string or an array of strings");
       if (!Array.isArray(q.choices) || q.choices.length < 2) throw new Error(at + " needs at least two choices");
       const type = q.type || (Array.isArray(q.answers) ? (q.twoPartHeaders ? "twopart" : "multi") : "mcq");
       const inRange = (v) => Number.isInteger(v) && v >= 0 && v < q.choices.length;
@@ -42,6 +46,11 @@
     set.title = set.title || set.section;
     set.questions = (set.questions || []).map(function (q, i) {
       const n = Object.assign({}, q);
+      if (n.passage != null && raw.passages && raw.passages[n.passage]) {
+        const p = raw.passages[n.passage];
+        const base = typeof p === "string" || Array.isArray(p) ? { text: p } : p;
+        n.stimulus = Object.assign({}, base, n.stimulus || {});
+      }
       n.type = n.type || (Array.isArray(n.answers) && n.twoPartHeaders ? "twopart" : Array.isArray(n.answers) ? "multi" : "mcq");
       n.id = n.id || i + 1;
       n.topic = n.topic || "Untagged";
@@ -191,6 +200,21 @@
       t.parentNode.replaceChild(formatRange(s, 0, s.length), t);
     }
   }
+
+  /* ---------------- paragraphs ----------------
+     Text fields may hold several paragraphs: separate them with a blank line
+     ("\n\n") or pass an array of strings. A single "\n" is a line break. */
+  function splitParas(text) {
+    if (Array.isArray(text)) return text.flatMap(splitParas);
+    if (text == null) return [];
+    return String(text).replace(/\r\n?/g, "\n").split(/\n[ \t]*\n+/).map((t) => t.trim()).filter(Boolean);
+  }
+  function prose(text, cls) {
+    const box = el("div", "prose" + (cls ? " " + cls : ""));
+    splitParas(text).forEach((t) => box.appendChild(el("p", null, t)));
+    return box;
+  }
+  const flatText = (text) => (Array.isArray(text) ? text.join("\n\n") : text == null ? "" : String(text));
 
   function typeset(node) {
     if (!node) return;
@@ -373,10 +397,17 @@
     $("flagBtn").textContent = S.flags[k] ? "Unflag" : "Flag for review";
 
     const stim = $("qStimulus");
+    // keep the reader's place when consecutive questions share a passage
+    const prevBox = stim.querySelector(".stimulus");
+    const prevKey = stim.dataset.key || "";
+    const prevScroll = prevBox ? prevBox.scrollTop : 0;
+    const stimKey = q.stimulus ? (q.passage != null ? "p:" + q.passage : "t:" + flatText(q.stimulus.text).slice(0, 200)) : "";
+    stim.dataset.key = stimKey;
     stim.innerHTML = "";
     if (q.stimulus) {
       const box = el("div", "stimulus");
-      if (q.stimulus.text) box.appendChild(el("p", null, q.stimulus.text));
+      if (q.stimulus.title) box.appendChild(el("div", "eyebrow stim-title", q.stimulus.title));
+      if (q.stimulus.text) box.appendChild(prose(q.stimulus.text));
       if (q.stimulus.table) {
         const t = el("table", "data");
         const thead = el("thead"), tr = el("tr");
@@ -392,8 +423,18 @@
       }
       stim.appendChild(box);
     }
+    // long single-passage stimuli (reading comprehension) sit beside the question on wide screens
+    const st = q.stimulus || {};
+    const nParas = splitParas(st.text).length;
+    const long = flatText(st.text).length > 900;
+    const split = st.layout === "split" || (st.layout !== "stacked" && !st.table && (nParas >= 2 || long));
+    $("examCard").classList.toggle("split", !!split);
+    const stimBox = stim.querySelector(".stimulus");
+    if (stimBox && stimKey && stimKey === prevKey) requestAnimationFrame(() => { stimBox.scrollTop = prevScroll; });
 
-    $("qStem").textContent = q.stem;
+    const stemEl = $("qStem");
+    stemEl.innerHTML = "";
+    stemEl.appendChild(prose(q.stem));
     const body = $("qBody");
     body.innerHTML = "";
     $("qFeedback").innerHTML = "";
@@ -482,7 +523,7 @@
     d.style.borderLeftColor = good ? "var(--ok)" : "var(--bad)";
     d.style.marginTop = "var(--space-5)";
     d.appendChild(el("div", "eyebrow", good ? "Correct" : "Incorrect — correct answer: " + answerLabel(q)));
-    d.appendChild(el("p", "why", q.why || ""));
+    d.appendChild(prose(q.why || "", "why"));
     box.appendChild(d);
     typeset(box);
   }
@@ -783,8 +824,8 @@
       const tdW = el("td");
       const det = el("details", "q-detail");
       det.appendChild(el("summary", null, "Solution"));
-      det.appendChild(el("div", "why", r.q.stem));
-      det.appendChild(el("div", "why", r.q.why || ""));
+      det.appendChild(prose(r.q.stem, "why"));
+      det.appendChild(prose(r.q.why || "", "why"));
       tdW.appendChild(det);
       tr.appendChild(tdW);
       tb.appendChild(tr);
@@ -846,8 +887,8 @@
           secondsOverTarget: Math.round(r.time - r.q.target),
           errorType: r.diag.tag,
           diagnosis: r.diag.note,
-          stem: r.q.stem,
-          takeaway: (r.q.why || "").replace(/\s+/g, " ")
+          stem: flatText(r.q.stem),
+          takeaway: flatText(r.q.why).replace(/\s+/g, " ")
         };
       })
     };
@@ -862,7 +903,7 @@
     rows.filter((r) => !r.correct || r.time > r.q.target * 1.15).forEach(function (r) {
       lines.push([today, S.set.section, S.set.title, r.pos, r.q.topic, r.q.diff,
         userAnswerText(r.q, r.a), answerLabel(r.q), fmt(r.time), fmt(r.q.target),
-        r.diag.tag, (r.q.why || "").replace(/\s+/g, " ")].join("\t"));
+        r.diag.tag, flatText(r.q.why).replace(/\s+/g, " ")].join("\t"));
     });
     const logObj = buildLogObject(rows, sum);
     const jsonText = JSON.stringify(logObj, null, 2);

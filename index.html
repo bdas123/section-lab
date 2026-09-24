@@ -69,6 +69,7 @@
           <button class="linklike" type="button" data-sample="example-sets/di-demo.json">Data Insights &middot; 4 q / 10 min</button>
           <button class="linklike" type="button" data-sample="example-sets/latex-sample.json">LaTeX demo &middot; 3 q / 5 min</button>
           <button class="linklike" type="button" data-sample="example-sets/boldface-demo.json">Boldface CR &middot; 3 q / 5 min</button>
+          <button class="linklike" type="button" data-sample="example-sets/rc-demo.json">Reading Comp &middot; 4 q / 7 min</button>
         </div>
       </div>
     </div>
@@ -93,13 +94,14 @@
         <p>Optional per question: <span class="mono">topic</span>, <span class="mono">diff</span>, <span class="mono">target</span> seconds, <span class="mono">why</span> for the review explanation, and <span class="mono">stimulus</span> for a passage or data table. Topic, difficulty, and target are what drive the pacing and error-log analysis, so keep them filled in.</p>
         <p><strong>LaTeX is supported</strong> anywhere text appears — stems, choices, passages, table cells, two-part headers, and explanations. Use <span class="mono">$ ... $</span> or <span class="mono">\( ... \)</span> for inline math and <span class="mono">$$ ... $$</span> or <span class="mono">\[ ... \]</span> for a display block. Inside a JSON file every backslash must be doubled, so <span class="mono">\frac{3}{4}</span> is written <span class="mono">"$\\frac{3}{4}$"</span>. Broken math is left as plain red text rather than breaking the question.</p>
         <p><strong>Bold, italics, and underline</strong> work in the same fields. Write <span class="mono">**bold**</span> or <span class="mono">\textbf{bold}</span>, <span class="mono">\emph{italic}</span> or <span class="mono">\textit{italic}</span>, and <span class="mono">\underline{text}</span>; in JSON these become <span class="mono">"\\textbf{...}"</span>. Math is allowed inside bold, and math spans are never touched, so <span class="mono">$a^{**}$</span> is safe. Type <span class="mono">\*\*</span> for literal asterisks. This is what Critical Reasoning boldface questions need: put the <span class="mono">**…**</span> portions in <span class="mono">stimulus.text</span>.</p>
+        <p><strong>Multiple paragraphs</strong> work in <span class="mono">stimulus.text</span>, <span class="mono">stem</span>, and <span class="mono">why</span>: separate paragraphs with a blank line (<span class="mono">"\n\n"</span>) or give an array of strings. A single <span class="mono">"\n"</span> is a line break. For reading comprehension, define a passage once in a top-level <span class="mono">"passages": {"p1": {"title": "Passage", "text": [...]}}</span> and point each question at it with <span class="mono">"passage": "p1"</span>. Long passages sit beside the question on wide screens; force it with <span class="mono">"layout": "split"</span> or <span class="mono">"stacked"</span>.</p>
       </div>
     </details>
   </div>
 
   <!-- EXAM -->
   <div id="screenExam" class="hidden">
-    <div class="card">
+    <div class="card exam-card" id="examCard">
       <div class="qhead">
         <span class="qcount" id="qCount">Question 1 of 21</span>
         <span class="chip" id="qTopic">Topic</span>
@@ -108,9 +110,11 @@
         <span class="qtime mono" id="qTime">0:00</span>
       </div>
       <div id="qStimulus"></div>
-      <div class="stem" id="qStem"></div>
-      <div id="qBody"></div>
-      <div id="qFeedback"></div>
+      <div class="qmain" id="qMain">
+        <div class="stem" id="qStem"></div>
+        <div id="qBody"></div>
+        <div id="qFeedback"></div>
+      </div>
       <div class="navrow">
         <button class="btn" id="prevBtn" type="button">Back</button>
         <button class="btn btn-primary" id="nextBtn" type="button">Next</button>
