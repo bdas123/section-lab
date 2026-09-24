@@ -23,7 +23,7 @@ Everything happens in your browser. Nothing is uploaded and nothing is stored on
 
 The app starts empty by design — you bring the questions. Three ways to load a set:
 
-0. **Load a sample** — click one of the sample links under the paste box (Quant section, Data Insights, or LaTeX demo). This is the fastest way to see the app work, and it needs the app to be served over http, so it works on the live demo but not from a double-clicked local file.
+0. **Load a sample** — click one of the sample links under the paste box (Quant section, Data Insights, LaTeX demo, or Boldface CR). This is the fastest way to see the app work, and it needs the app to be served over http, so it works on the live demo but not from a double-clicked local file.
 1. **Drag and drop** a `.json` file onto the dashed panel.
 2. **Choose file** to pick one or several files at once.
 3. **Paste JSON** into the box on the right and press Add set.
@@ -35,6 +35,7 @@ Start with the samples in `example-sets/`:
 | `quant-01.json` | 21 Problem Solving questions, 45 minutes — a full quant section |
 | `di-demo.json` | 4 Data Insights questions in 10 minutes, showing tables, multi-select, and two-part |
 | `latex-sample.json` | 3 questions demonstrating LaTeX math rendering |
+| `boldface-demo.json` | 2 Critical Reasoning boldface questions plus a bold-and-math check |
 
 Each loaded set shows as a card with its question count, time limit, and average seconds per question. Click a card to select it. Remove clears it. Sets live in the tab only, so reload the page and you start clean.
 

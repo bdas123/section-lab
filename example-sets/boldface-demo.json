@@ -1,0 +1,57 @@
+{
+  "id": "boldface-demo",
+  "title": "Boldface & Formatting Demo",
+  "section": "Verbal Reasoning",
+  "minutes": 5,
+  "note": "Two Critical Reasoning boldface questions plus a quant item that mixes bold, italics, and math. Exercises both bold styles (double asterisks and textbf), italics, and math inside bold.",
+  "questions": [
+    {
+      "id": 1,
+      "topic": "CR · Boldface",
+      "diff": "Medium",
+      "target": 120,
+      "stimulus": {
+        "text": "City planner: Critics claim that the new bike lanes on Harbor Street have hurt local shops. **Foot traffic on Harbor Street fell by 12 percent in the six months after the lanes opened.** But the same six months saw a citywide decline in retail visits of nearly 15 percent. **The bike lanes therefore cannot be blamed for the drop in visits to Harbor Street shops.**"
+      },
+      "stem": "In the planner's argument, the two portions in **boldface** play which of the following roles?",
+      "choices": [
+        "The first is evidence the planner uses to support the conclusion; the second is that conclusion.",
+        "The first is evidence cited in support of a position the planner opposes; the second is the planner's conclusion.",
+        "The first is the planner's main conclusion; the second is evidence offered in support of it.",
+        "The first is a finding the planner disputes; the second is an intermediate conclusion drawn from that finding.",
+        "The first is evidence the planner accepts as accurate; the second is a consideration that weighs against the planner's conclusion."
+      ],
+      "answer": 1,
+      "why": "The critics use the **12 percent drop** to argue the lanes hurt shops; the planner concedes the number but opposes the critics' position. The second bold sentence, introduced by *therefore*, is the planner's **main conclusion**. Watch for (A): the planner does not use the first statement to support the conclusion — it supports the other side."
+    },
+    {
+      "id": 2,
+      "topic": "CR · Boldface",
+      "diff": "Hard",
+      "target": 135,
+      "stimulus": {
+        "text": "Analyst: Many believe that \\textbf{raising the minimum order size will reduce the company's shipping costs}, since fewer small orders means fewer shipments. This belief is mistaken. Customers who can no longer place small orders tend to split their purchases across competitors, and \\textbf{the company's remaining orders would come disproportionately from distant regions}, where each shipment costs far more."
+      },
+      "stem": "The portions in \\textbf{boldface} play which of the following roles in the analyst's argument?",
+      "choices": [
+        "The first is a prediction the analyst rejects; the second is evidence the analyst offers against that prediction.",
+        "The first is the analyst's conclusion; the second is evidence supporting that conclusion.",
+        "The first is a prediction the analyst accepts; the second is a consequence of that prediction.",
+        "The first is evidence against the analyst's position; the second is the analyst's conclusion.",
+        "The first and the second are both predictions the analyst rejects."
+      ],
+      "answer": 0,
+      "why": "\"This belief is mistaken\" is the analyst's conclusion, and it rejects the first bold portion. The second bold portion explains \\emph{why} costs would not fall, so it is evidence against the first."
+    },
+    {
+      "id": 3,
+      "topic": "Formatting check",
+      "diff": "Easy",
+      "target": 60,
+      "stem": "If $x$ is a **positive integer** and $x^2 < 20$, what is the \\textbf{greatest possible value of $x$}? \\emph{Note:} this item also checks that math inside bold renders.",
+      "choices": ["$2$", "$3$", "$4$", "$5$", "$\\sqrt{20}$"],
+      "answer": 2,
+      "why": "**$4^2 = 16 < 20$** but $5^2 = 25 > 20$, so the greatest integer is $4$. Choice (E) is not an integer. A literal double asterisk can still be typed as \\*\\*."
+    }
+  ]
+}

@@ -64,8 +64,138 @@
 
   const $ = (id) => document.getElementById(id);
   const el = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n; };
+  /* ---------------- inline text formatting ----------------
+     Bold:    **text**  or  \textbf{text}
+     Italic:  *text*  or  \emph{text}  or  \textit{text}
+     Underline: \underline{text}
+     Math spans ($...$, $$...$$, \(...\), \[...\]) are passed through untouched
+     so KaTeX still sees them; \textbf inside math is handled by KaTeX itself.
+     A literal asterisk pair can be written \*\*. */
+  const MATH_DELIMS = [["$$", "$$"], ["\\[", "\\]"], ["\\(", "\\)"], ["$", "$"]];
+  const FMT_CMDS = { "\\textbf{": "strong", "\\emph{": "em", "\\textit{": "em", "\\underline{": "u" };
+  const FMT_SKIP_TAGS = /^(SCRIPT|STYLE|TEXTAREA|PRE|CODE|OPTION|NOSCRIPT)$/;
+  const FMT_TEST = /\*|\\textbf\{|\\emph\{|\\textit\{|\\underline\{|\\\*/;
+
+  function mathEndAt(s, i) {
+    if (s[i - 1] === "\\" && s[i] === "$") return -1;           // escaped \$ is a literal dollar
+    for (const [l, r] of MATH_DELIMS) {
+      if (s.startsWith(l, i)) {
+        const j = s.indexOf(r, i + l.length);
+        return j === -1 ? -1 : j + r.length;
+      }
+    }
+    return -1;
+  }
+  // index just past the brace that closes a group opened right before `from`, or -1
+  function braceClose(s, from) {
+    let depth = 1;
+    for (let i = from; i < s.length; i++) {
+      const m = mathEndAt(s, i);
+      if (m !== -1) { i = m - 1; continue; }
+      if (s[i] === "\\" && (s[i + 1] === "{" || s[i + 1] === "}")) { i++; continue; }
+      if (s[i] === "{") depth++;
+      else if (s[i] === "}" && --depth === 0) return i;
+    }
+    return -1;
+  }
+  function nextStars(s, from) {
+    for (let i = from; i < s.length; i++) {
+      const m = mathEndAt(s, i);
+      if (m !== -1) { i = m - 1; continue; }
+      if (s[i] === "\\" && s[i + 1] === "*") { i++; continue; }
+      if (s.startsWith("**", i)) return i;
+    }
+    return -1;
+  }
+  function nextStar(s, from, to) {
+    for (let i = from; i < to; i++) {
+      const m = mathEndAt(s, i);
+      if (m !== -1) { i = m - 1; continue; }
+      if (s[i] === "\\" && s[i + 1] === "*") { i++; continue; }
+      if (s[i] === "*") {
+        if (s[i + 1] === "*") { i++; continue; }
+        if (!/\s/.test(s[i - 1]) && !/[A-Za-z0-9]/.test(s[i + 1] || "")) return i;
+      }
+    }
+    return -1;
+  }
+  // build a fragment for s[from, to)
+  function formatRange(s, from, to) {
+    const frag = document.createDocumentFragment();
+    let buf = "";
+    const flush = () => { if (buf) { frag.appendChild(document.createTextNode(buf)); buf = ""; } };
+    let i = from;
+    while (i < to) {
+      const m = mathEndAt(s, i);
+      if (m !== -1 && m <= to) { buf += s.slice(i, m); i = m; continue; }
+      if (s[i] === "\\" && s[i + 1] === "*") { buf += "*"; i += 2; continue; }
+      if (s.startsWith("**", i)) {
+        const close = nextStars(s, i + 2);
+        if (close !== -1 && close < to && close > i + 2) {
+          flush();
+          const b = document.createElement("strong");
+          b.appendChild(formatRange(s, i + 2, close));
+          frag.appendChild(b);
+          i = close + 2;
+          continue;
+        }
+      }
+      // *italic*: opener not after a letter/digit and not before a space; closer the reverse (so 3*4*5 stays literal)
+      if (s[i] === "*" && s[i + 1] !== "*" && s[i + 1] && !/\s/.test(s[i + 1]) && !/[A-Za-z0-9*]/.test(s[i - 1] || "")) {
+        const close = nextStar(s, i + 1, to);
+        if (close !== -1) {
+          flush();
+          const n = document.createElement("em");
+          n.appendChild(formatRange(s, i + 1, close));
+          frag.appendChild(n);
+          i = close + 1;
+          continue;
+        }
+      }
+      if (s[i] === "\\") {
+        const cmd = Object.keys(FMT_CMDS).find((c) => s.startsWith(c, i));
+        if (cmd) {
+          const close = braceClose(s, i + cmd.length);
+          if (close !== -1 && close < to) {
+            flush();
+            const n = document.createElement(FMT_CMDS[cmd]);
+            n.appendChild(formatRange(s, i + cmd.length, close));
+            frag.appendChild(n);
+            i = close + 1;
+            continue;
+          }
+        }
+      }
+      buf += s[i]; i++;
+    }
+    flush();
+    return frag;
+  }
+  function formatText(node) {
+    if (!node) return;
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, {
+      acceptNode(t) {
+        for (let p = t.parentNode; p && p !== node.parentNode; p = p.parentNode) {
+          if (p.nodeType !== 1) continue;
+          if (FMT_SKIP_TAGS.test(p.tagName)) return NodeFilter.FILTER_REJECT;
+          const c = p.classList;
+          if (c && (c.contains("katex") || c.contains("export") || c.contains("no-math") || c.contains("no-format"))) return NodeFilter.FILTER_REJECT;
+        }
+        return FMT_TEST.test(t.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+      }
+    });
+    const hits = [];
+    while (walker.nextNode()) hits.push(walker.currentNode);
+    for (const t of hits) {
+      const s = t.nodeValue;
+      t.parentNode.replaceChild(formatRange(s, 0, s.length), t);
+    }
+  }
+
   function typeset(node) {
-    if (!node || typeof window.renderMathInElement !== "function") return;
+    if (!node) return;
+    formatText(node);
+    if (typeof window.renderMathInElement !== "function") return;
     try {
       window.renderMathInElement(node, {
         delimiters: [

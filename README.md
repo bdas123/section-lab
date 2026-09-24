@@ -28,6 +28,7 @@ The review table diagnoses every question, and the pacing curve shows cumulative
 - **Per-question time banking.** Time is attributed to whichever question is on screen, including revisits, so the accounting survives jumping around.
 - **Question types.** Multiple choice, multi-select ("select all that apply"), and two-part analysis, with optional passage or data-table stimulus.
 - **LaTeX rendering.** Math anywhere in a set — stems, choices, passages, table cells, explanations.
+- **Bold, italics, underline.** `**bold**`, `\textbf{}`, `\emph{}`, `\underline{}` in any text field — enough for Critical Reasoning boldface questions.
 - **Flags, palette, keyboard shortcuts.** `A`–`E` to answer, arrows to move, `F` to flag.
 - **Post-section report.** Accuracy, rough score band, pacing curve against an even-pace benchmark, accuracy by topic and difficulty, a per-question review table with diagnosis, and collapsible solutions.
 - **Error log export.** Download the flagged questions as JSON, or copy a tab-separated block that pastes straight into a spreadsheet error log.
@@ -52,12 +53,12 @@ Any static host works too — GitHub Pages, Netlify, an S3 bucket, or `python3 -
 
 Then:
 
-1. Click one of the **Load a sample** links (quant section, Data Insights, or LaTeX demo), or bring your own: drag a set file onto the dropzone, click **Choose file**, or paste JSON and press **Add set**. Nothing ships bundled — the app starts empty on purpose. The sample links fetch from `example-sets/`, so they need the app served over http; opening `index.html` directly still works with Choose file.
+1. Click one of the **Load a sample** links (quant section, Data Insights, LaTeX demo, or boldface CR), or bring your own: drag a set file onto the dropzone, click **Choose file**, or paste JSON and press **Add set**. Nothing ships bundled — the app starts empty on purpose. The sample links fetch from `example-sets/`, so they need the app served over http; opening `index.html` directly still works with Choose file.
 2. Pick the set card you want, choose any options (shuffle, practice mode, reveal answers), and press **Start section**.
 3. Work the section. The clock does not stop unless practice mode is on.
 4. Read the report, then download the JSON error log.
 
-`example-sets/` contains three ready-to-load files: a 21-question quant section, a short Data Insights demo exercising every question type, and a LaTeX smoke test.
+`example-sets/` contains four ready-to-load files: a 21-question quant section, a short Data Insights demo exercising every question type, a LaTeX smoke test, and a boldface Critical Reasoning demo.
 
 ## Writing your own sets
 
@@ -86,7 +87,7 @@ A set is a single JSON object. See [SET-FORMAT.md](SET-FORMAT.md) for the full s
 
 `topic`, `diff`, and `target` are what drive the analysis, so fill them in. A `.json` file may hold one set object or an array of sets, and multiple files can be loaded at once. Malformed sets are rejected on load with the specific reason, so a broken set never starts a timed section.
 
-LaTeX uses `$ ... $` or `\( ... \)` inline and `$$ ... $$` or `\[ ... \]` for display blocks. Remember that JSON requires doubled backslashes: `"$\\frac{3}{4}$"`.
+LaTeX uses `$ ... $` or `\( ... \)` inline and `$$ ... $$` or `\[ ... \]` for display blocks. Remember that JSON requires doubled backslashes: `"$\\frac{3}{4}$"`. Bold is `**text**` or `"\\textbf{text}"`; see `SET-FORMAT.md` for italics and underline.
 
 ## Diagnosis taxonomy
 

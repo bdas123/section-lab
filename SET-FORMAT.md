@@ -47,3 +47,21 @@ Math is rendered with KaTeX (bundled in `vendor/katex/`, so it works offline). E
 | `\[ ... \]` | display block |
 
 Because sets are JSON, backslashes must be escaped: write `"$\\frac{3}{4}$"` to get \(\frac{3}{4}\), and `"$\\sqrt{x^3}$"` for a root. Literal dollar amounts inside math should use `\\$`, or keep them outside the math delimiters. Malformed expressions render in red as plain text instead of breaking the section, so a typo never blocks a timed run.
+
+## Bold, italics, and underline
+
+Every text field that accepts LaTeX also accepts inline formatting:
+
+| You write (in the JSON string) | Renders as |
+| --- | --- |
+| `**text**` | bold |
+| `\\textbf{text}` | bold |
+| `\\emph{text}` or `\\textit{text}` | italic |
+| `\\underline{text}` | underline |
+| `\\*\\*` | literal `**` |
+
+- Formatting can wrap math: `"**the greatest value of $x$**"` bolds the sentence and still renders `$x$`.
+- Math spans are passed to KaTeX untouched, so `**` inside `$...$` is not treated as bold, and `\\textbf{}` inside math is KaTeX's own bold.
+- Unclosed markers (a lone `**` or a `\\textbf{` with no closing brace) are left as plain text rather than bolding the rest of the question.
+- Critical Reasoning boldface questions: put the argument in `stimulus.text` with the two portions wrapped in `**...**`, and ask about their roles in `stem`. See `example-sets/boldface-demo.json`.
+- The exported error log keeps the raw markers, so a stem round-trips unchanged.
