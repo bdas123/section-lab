@@ -3,6 +3,23 @@
   "title": "Quant Section 1 — Mixed Fundamentals",
   "section": "Quantitative Reasoning",
   "minutes": 45,
+  "scoreContext": {
+    "week": 3,
+    "day": 2,
+    "date": "2026-09-30",
+    "quant": [
+      78,
+      82
+    ],
+    "verbal": [
+      79,
+      83
+    ],
+    "di": [
+      80,
+      84
+    ]
+  },
   "note": "Problem Solving only, mirroring the GMAT Focus quant section: 21 questions in 45 minutes (about 2:09 per question).",
   "questions": [
     {

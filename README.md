@@ -108,6 +108,10 @@ The score band is **difficulty-calibrated**. Each difficulty tag gets a level on
 
 The report places that band on the recent test-taker distribution for the section: a histogram of section scores with your band highlighted, and the percentile at the low, point, and high ends. Quant and Verbal use GMAC's August 2026 concordance tables (exams July 2021 – June 2026, to the tenth of a percent); Data Insights uses the same August 2026 update in whole percents. The numbers live in `percentiles.js` — GMAC refreshes them every Q3, so update that file when new tables come out.
 
+### Effect on your overall score
+
+A set can carry a `scoreContext` with your current Quant, Verbal, and Data Insights ranges for that week and day. The report then shows the projected total coming in, the projected total with the new section estimate swapped in, the change in points, and both percentiles. See [SET-FORMAT.md](SET-FORMAT.md#score-context-where-you-stand-coming-in).
+
 ### Full exam and projected total
 
 The setup screen has a **Full exam** panel: pick one Quant, one Verbal, and one Data Insights set and the section order, then run them back to back. You get one optional 10-minute break between sections, and results stay hidden until the end. The final report shows a **projected total score range** (point estimate ± the combined section uncertainty, about ±20 for full-length sections) with its percentile on GMAC's August 2026 total-score table, a 205–805 distribution chart, each section's band and percentile, a link to each section's full report, and one combined JSON log.

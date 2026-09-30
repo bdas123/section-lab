@@ -22,6 +22,7 @@
     if (!set || typeof set !== "object" || Array.isArray(set)) throw new Error("a set must be a JSON object");
     if (!Array.isArray(set.questions) || !set.questions.length) throw new Error("no questions array found");
     if (set.passages != null && (typeof set.passages !== "object" || Array.isArray(set.passages))) throw new Error("'passages' must be an object of named passages");
+    if (set.scoreContext != null) parseScoreContext(set.scoreContext);
     set.questions.forEach(function (q, i) {
       const at = "question " + (i + 1);
       if (!q || typeof q !== "object") throw new Error(at + " is not an object");
@@ -43,6 +44,7 @@
   function normalizeSet(raw) {
     const set = Object.assign({}, raw);
     set.id = set.id || "set-" + (SETS.length + 1);
+    set.ctx = set.scoreContext != null ? parseScoreContext(set.scoreContext) : null;
     set.section = set.section || "Practice Section";
     set.title = set.title || set.section;
     set.questions = (set.questions || []).map(function (q, i) {
@@ -273,6 +275,10 @@
       meta.appendChild(el("span", null, fmt((set.minutes * 60) / set.questions.length) + " per question"));
       b.appendChild(meta);
       if (set.note) b.appendChild(el("p", "note", set.note));
+      if (set.ctx) {
+        const bits = SECTION_KEYS.filter((k) => set.ctx.bands[k]).map((k) => SHORT[k] + " " + rangeTxt(set.ctx.bands[k]));
+        b.appendChild(el("p", "ctx-line", ctxLabel(set.ctx) + " \u00b7 coming in: " + bits.join(" \u00b7 ")));
+      }
       b.addEventListener("click", function () { selectedSetId = set.id; renderSetGrid(); updateHint(); });
       const rm = el("button", "remove-set", "Remove");
       rm.type = "button";
@@ -756,7 +762,8 @@
 
     if (ptab) root.appendChild(percentileSection(ptab, band));
     root.appendChild(calibrationSection(rows, sm));
-    if (!opts.onBack && ptab) { const pj = latestProjectionSection(); if (pj) root.appendChild(pj); }
+    if (ptab && S.set.ctx) { const fr = {}; fr[ptab.key] = band; root.appendChild(impactSection(S.set.ctx, fr)); }
+    else if (!opts.onBack && ptab) { const pj = latestProjectionSection(); if (pj) root.appendChild(pj); }
     root.appendChild(bandSection(rows));
     root.appendChild(paceSection(rows));
     root.appendChild(groupSection("Accuracy by topic", rows, (r) => r.q.topic));
@@ -941,6 +948,128 @@
     const seSum = Math.sqrt(bands.reduce((a, b) => a + Math.pow(b.se != null ? b.se : 2, 2), 0));
     const half = Math.max(10, 10 * Math.round((seSum * 20) / 3 / 10));
     return { low: Math.max(205, mid - half), mid: mid, high: Math.min(805, mid + half), sum: sum, half: half, seSum: seSum };
+  }
+
+  /* ---------------- score context: where you stand coming into this set ----------------
+     A set may carry "scoreContext": { week, day, date, label, quant: [lo, hi], verbal: [lo, hi], di: [lo, hi] }.
+     Ranges can be [low, high], { low, high }, or a single score. After the section, the report swaps in the
+     new estimate for whichever sections were just taken and shows the change in the projected total. */
+  const CTX_KEYS = { quant: "quant", q: "quant", quantitative: "quant", "quantitative reasoning": "quant",
+    verbal: "verbal", v: "verbal", "verbal reasoning": "verbal", di: "di", "data insights": "di", datainsights: "di", data_insights: "di" };
+  function parseScoreContext(sc) {
+    if (!sc || typeof sc !== "object" || Array.isArray(sc)) throw new Error("scoreContext must be an object");
+    const out = { week: sc.week, day: sc.day, date: sc.date, label: sc.label, bands: {} };
+    Object.keys(sc).forEach(function (k) {
+      const key = CTX_KEYS[k.toLowerCase().trim()];
+      if (!key) return;
+      let v = sc[k], lo, hi;
+      if (v == null) return;
+      if (typeof v === "number") { lo = hi = v; }
+      else if (Array.isArray(v) && v.length === 2) { lo = v[0]; hi = v[1]; }
+      else if (typeof v === "object" && v.low != null && v.high != null) { lo = v.low; hi = v.high; }
+      else throw new Error("scoreContext." + k + " must be [low, high], {\"low\":..,\"high\":..}, or one score");
+      if (![lo, hi].every((x) => Number.isInteger(x) && x >= 60 && x <= 90)) throw new Error("scoreContext." + k + " scores must be whole numbers from 60 to 90");
+      if (lo > hi) { const t = lo; lo = hi; hi = t; }
+      out.bands[key] = { low: lo, high: hi, mid: (lo + hi) / 2, se: Math.max(1, (hi - lo) / 2) };
+    });
+    if (!Object.keys(out.bands).length) throw new Error("scoreContext needs at least one of quant, verbal, di");
+    return out;
+  }
+  function ctxLabel(ctx) {
+    if (ctx.label) return String(ctx.label);
+    const parts = [];
+    if (ctx.week != null) parts.push("Week " + ctx.week);
+    if (ctx.day != null) parts.push("Day " + ctx.day);
+    if (ctx.date) parts.push(String(ctx.date));
+    return parts.join(" \u00b7 ") || "Coming in";
+  }
+  const rangeTxt = (b) => (b.low === b.high ? String(b.low) : b.low + "\u2013" + b.high);
+  const totalTxt = (t) => t.mid + " (" + t.low + "\u2013" + t.high + ")";
+
+  // before = scoreContext ranges; after = the same with this session's sections replaced
+  function computeImpact(ctx, fresh) {
+    const P = PCT(), T = P && P.total;
+    const rows = SECTION_KEYS.map(function (k) {
+      const before = ctx.bands[k] || null, now = fresh[k] || null;
+      return { key: k, before: before, after: now || before, taken: !!now };
+    });
+    const complete = (side) => rows.every((r) => r[side]);
+    const bt = complete("before") ? projectTotal(rows.map((r) => r.before)) : null;
+    const at = complete("after") ? projectTotal(rows.map((r) => r.after)) : null;
+    return {
+      rows: rows, before: bt, after: at, delta: bt && at ? at.mid - bt.mid : null,
+      pct: T ? { before: bt ? pctAt(T, bt.mid) : null, after: at ? pctAt(T, at.mid) : null } : {},
+      missing: rows.filter((r) => !r.after).map((r) => r.key)
+    };
+  }
+
+  function impactSection(ctx, fresh) {
+    const P = PCT(), T = P.total;
+    const im = computeImpact(ctx, fresh);
+    const taken = im.rows.filter((r) => r.taken).map((r) => SHORT[r.key]);
+    const what = taken.length === 3 ? "these three sections" : "this " + taken.join(" + ") + " section";
+    const s = el("section", "block impact-block");
+    s.appendChild(el("h2", null, "Effect on your overall score"));
+    const lead = el("p", "why no-format");
+    if (im.before && im.after) {
+      const d = im.delta;
+      lead.textContent = "Coming in (" + ctxLabel(ctx) + "), your projected total was " + totalTxt(im.before) + ", about the " + ordinal(im.pct.before) +
+        " percentile. With " + what + " swapped in, it is " + totalTxt(im.after) + ", about the " + ordinal(im.pct.after) + " percentile: " +
+        (d === 0 ? "no change to the point estimate." : (d > 0 ? "+" : "\u2212") + Math.abs(d) + " points.");
+    } else if (im.after) {
+      lead.textContent = "With " + what + " added to your " + ctxLabel(ctx) + " ranges, the projected total is " + totalTxt(im.after) +
+        ", about the " + ordinal(im.pct.after) + " percentile. Add every section to scoreContext to see the before-and-after change.";
+    } else {
+      lead.textContent = "Add " + im.missing.map((k) => P[k].label).join(" and ") + " to this set's scoreContext to project a total. The section change is below.";
+    }
+    s.appendChild(lead);
+    if (im.before && im.after) {
+      const hd = el("div", "impact-head");
+      const box = (k, t, p) => { const c = el("div", "impact-box"); c.appendChild(el("div", "k", k)); c.appendChild(el("div", "v", t.low + "\u2013" + t.high)); c.appendChild(el("div", "sub", "point " + t.mid + " \u00b7 " + ordinal(p) + " percentile")); return c; };
+      hd.appendChild(box("Coming in \u00b7 " + ctxLabel(ctx), im.before, im.pct.before));
+      const arrow = el("div", "impact-delta " + (im.delta > 0 ? "up" : im.delta < 0 ? "down" : ""), (im.delta > 0 ? "+" : im.delta < 0 ? "\u2212" : "\u00b1") + Math.abs(im.delta));
+      hd.appendChild(arrow);
+      hd.appendChild(box("After this session", im.after, im.pct.after));
+      s.appendChild(hd);
+    }
+    const tbl = el("table", "data");
+    const hr = el("tr"); ["Section", "Coming in", "This session", "Change"].forEach((h) => hr.appendChild(el("th", null, h)));
+    const th = el("thead"); th.appendChild(hr); tbl.appendChild(th);
+    const tb = el("tbody");
+    im.rows.forEach(function (r) {
+      const tr = el("tr"); if (r.taken) tr.className = "taken";
+      tr.appendChild(el("td", null, P[r.key].label));
+      tr.appendChild(el("td", "mono", r.before ? rangeTxt(r.before) : "\u2014"));
+      tr.appendChild(el("td", "mono", r.taken ? rangeTxt(r.after) : "held"));
+      const d = r.taken && r.before ? Math.round((r.after.mid - r.before.mid) * 10) / 10 : null;
+      tr.appendChild(el("td", "mono " + (d > 0 ? "pos" : d < 0 ? "neg" : ""), d == null ? "\u2014" : (d > 0 ? "+" : d < 0 ? "\u2212" : "\u00b1") + Math.abs(d)));
+      tb.appendChild(tr);
+    });
+    if (im.before || im.after) {
+      const tr = el("tr", "total-row");
+      tr.appendChild(el("td", null, "Projected total"));
+      tr.appendChild(el("td", "mono", im.before ? totalTxt(im.before) : "\u2014"));
+      tr.appendChild(el("td", "mono", im.after ? totalTxt(im.after) : "\u2014"));
+      tr.appendChild(el("td", "mono " + (im.delta > 0 ? "pos" : im.delta < 0 ? "neg" : ""), im.delta == null ? "\u2014" : (im.delta > 0 ? "+" : im.delta < 0 ? "\u2212" : "\u00b1") + Math.abs(im.delta)));
+      tb.appendChild(tr);
+    }
+    tbl.appendChild(tb);
+    const tw = el("div", "table-scroll"); tw.appendChild(tbl); s.appendChild(tw);
+    const note = el("p", "pct-note");
+    note.textContent = "Sections you didn't take this session are held at their scoreContext ranges; section changes compare range midpoints. Each total uses (Q + V + DI \u2212 180) \u00d7 20/3 + 205 with its range from the section uncertainties, and percentiles come from GMAC's August 2026 total-score table.";
+    s.appendChild(note);
+    return s;
+  }
+  function impactLog(ctx, fresh) {
+    const im = computeImpact(ctx, fresh);
+    const tot = (t, p) => (t ? { low: t.low, mid: t.mid, high: t.high, percentile: p } : null);
+    return {
+      context: { week: ctx.week, day: ctx.day, date: ctx.date, label: ctxLabel(ctx), ranges: ctx.bands },
+      sections: im.rows.map((r) => ({ section: r.key, comingIn: r.before ? [r.before.low, r.before.high] : null, thisSession: r.taken ? [r.after.low, r.after.high] : null })),
+      projectedTotalBefore: tot(im.before, im.pct.before),
+      projectedTotalAfter: tot(im.after, im.pct.after),
+      deltaPoints: im.delta
+    };
   }
 
   /* ---------------- section history (this tab, plus any error logs you load back in) ---------------- */
@@ -1185,6 +1314,9 @@
     });
     addKpi("Time used", fmt(usedAll), "of " + fmt(totalAll) + (EXAM.breakUsed ? " + break" : ", no break"));
     root.appendChild(kpis);
+    const exCtxSet = EXAM.sets.find((x) => x.ctx);
+    const freshAll = {}; SECTION_KEYS.forEach((k) => { freshAll[k] = byKey[k].sm.band; });
+    if (exCtxSet) root.appendChild(impactSection(exCtxSet.ctx, freshAll));
 
     root.appendChild(percentileSection(T, pj, {
       title: "Where the projected total sits among test takers",
@@ -1246,6 +1378,7 @@
         halfWidth: pj.half,
         source: T.source, sourceUrl: T.url
       },
+      overallImpact: exCtxSet ? impactLog(exCtxSet.ctx, freshAll) : null,
       sections: secs.map(function (x) {
         restore(x.snap);
         return buildLogObject(x.sm.rows, { n: x.sm.n, correct: x.sm.correct, pct: x.sm.pct, used: x.sm.used, blanks: x.sm.blanks, careless: x.sm.careless, overTarget: x.sm.overTarget, est: x.sm.est, rawEst: x.sm.rawEst, cal: x.sm.cal, band: x.sm.band, ptab: x.sm.ptab, expired: x.snap.expired });
@@ -1511,6 +1644,7 @@
             return g;
           })
         } : null,
+        overallImpact: sum.ptab && S.set.ctx ? impactLog(S.set.ctx, (function () { const f = {}; f[sum.ptab.key] = sum.band; return f; })()) : null,
         secondsUsed: Math.round(sum.used),
         secondsAvailable: S.total,
         avgSecondsPerQuestion: Math.round(sum.used / sum.n),

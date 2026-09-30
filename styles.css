@@ -420,3 +420,16 @@ ul.method li { margin: var(--space-2) 0; }
 .cal-block > .why { max-width: 76ch; }
 .cal-block td.pos { color: var(--ok); font-weight: 600; }
 .cal-block td.neg { color: var(--bad); font-weight: 600; }
+.ctx-line { font-size: var(--text-xs); color: var(--accent); margin-top: var(--space-2); font-variant-numeric: tabular-nums; }
+.impact-head { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; margin: var(--space-4) 0; }
+.impact-box { flex: 1 1 200px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4) var(--space-5); }
+.impact-box .k { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); }
+.impact-box .v { font-size: var(--text-xl); font-weight: 700; font-variant-numeric: tabular-nums; margin-top: var(--space-1); }
+.impact-box .sub { font-size: var(--text-xs); color: var(--ink-2); }
+.impact-delta { font-size: var(--text-lg); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink-2); padding: 0 var(--space-2); }
+.impact-delta.up { color: var(--ok); }
+.impact-delta.down { color: var(--bad); }
+.impact-block td.pos { color: var(--ok); font-weight: 600; }
+.impact-block td.neg { color: var(--bad); font-weight: 600; }
+.impact-block tr.taken td:first-child { font-weight: 600; }
+.impact-block tr.total-row td { font-weight: 700; border-top: 2px solid var(--border); }

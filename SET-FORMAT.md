@@ -19,6 +19,27 @@ No sets ship with the app. Any section works — Quant, Verbal, Data Insights �
 
 Difficulty drives the score calibration. `diff` labels containing Easy, Medium, Hard, or Very hard (or 500/600/700/800-level) map to levels 67, 75, 82, and 86 on the section scale. To use your own labels or levels, add a set-level map such as `"difficultyLevels": {"Foundation": 66, "Core": 74, "Stretch": 83}`, or give a single question a numeric `"level": 80`. Unrecognised labels count as 75.
 
+## Score context (where you stand coming in)
+
+Add `scoreContext` to a set to record your current score range for all three sections on the day you take it. After the section, the report adds **Effect on your overall score**: the projected total coming in, the projected total with this section's new estimate swapped in (the other two held), the change in points, and both percentiles. In a full three-section exam all three sections are swapped in; the first set with a `scoreContext` supplies the starting point.
+
+```json
+"scoreContext": {
+  "week": 3,
+  "day": 2,
+  "date": "2026-09-30",
+  "quant": [78, 82],
+  "verbal": [79, 83],
+  "di": [80, 84]
+}
+```
+
+- Each range is `[low, high]`, `{"low": 78, "high": 82}`, or a single score, all whole numbers from 60 to 90. The width of the range is treated as its uncertainty.
+- Include the section you're about to take as well, so the report can show that section's own change.
+- `week`, `day`, `date`, and an optional `label` (e.g. `"Week 3 · Day 2"`) are shown on the set card and in the report.
+- If a section is missing, the report still shows the section change but can't project the "coming in" total.
+- The exported JSON carries the result under `summary.overallImpact` (or top-level `overallImpact` for a full exam).
+
 ## Question fields
 
 | Field | Required | Notes |

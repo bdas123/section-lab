@@ -89,6 +89,10 @@ Diagnoses come from correctness plus time against target:
 
 The distinction matters because the fixes are opposite. Careless misses need a process change; content gaps need study time.
 
+### Effect on your overall score
+
+If the set's JSON includes a `scoreContext` (your current range in each section for that week and day), the report adds **Effect on your overall score**. It shows the projected total you came in with, the total with this section's new estimate swapped in while the other two stay put, the change in points, and the percentile before and after. After a full exam, all three sections are swapped in.
+
 ### Full exam and projected total
 
 To simulate test day, use the **Full exam** panel on the setup screen. Choose a Quant, Verbal, and Data Insights set and a section order, then press **Start full exam**. Between sections you can take one 10-minute break (it auto-starts the next section when it runs out) or go straight on. Section results stay hidden until the end.
