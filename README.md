@@ -108,6 +108,12 @@ The score band in the report is a rough, non-adaptive approximation from raw acc
 
 The report places that band on the recent test-taker distribution for the section: a histogram of section scores with your band highlighted, and the percentile at the low, point, and high ends. Quant and Verbal use GMAC's August 2026 concordance tables (exams July 2021 – June 2026, to the tenth of a percent); Data Insights uses the same August 2026 update in whole percents. The numbers live in `percentiles.js` — GMAC refreshes them every Q3, so update that file when new tables come out.
 
+### Full exam and projected total
+
+The setup screen has a **Full exam** panel: pick one Quant, one Verbal, and one Data Insights set and the section order, then run them back to back. You get one optional 10-minute break between sections, and results stay hidden until the end. The final report shows a **projected total score range** (point estimate ±20) with its percentile on GMAC's August 2026 total-score table, a 205–805 distribution chart, each section's band and percentile, a link to each section's full report, and one combined JSON log.
+
+The total uses GMAC's equal section weighting: `(Q + V + DI − 180) × 20/3 + 205`, rounded to a total ending in 5 (80/80/82 → 615). After any single section, the report also projects a total from your latest saved result in each section, if all three exist. Those results are kept in this browser's local storage and can be cleared from the report. The **Mini full exam** sample loads three short sets to try the flow.
+
 ## Project layout
 
 ```
@@ -121,7 +127,7 @@ vendor/katex/     bundled KaTeX (MIT) for offline math rendering
 
 ## Privacy
 
-Sets you load stay in the browser tab. Nothing is uploaded, and there is no analytics or network call of any kind after the page loads. Closing the tab discards everything, so download the error log before you leave.
+Sets you load stay in the browser tab. Nothing is uploaded, and there is no analytics or network call of any kind after the page loads. The only thing saved is a short list of section scores (set title, date, estimate) in this browser's local storage, used for the projected total; clear it from any report. Download the error log before you leave — everything else is discarded when the tab closes.
 
 ## License
 

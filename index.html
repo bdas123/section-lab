@@ -70,6 +70,7 @@
           <button class="linklike" type="button" data-sample="example-sets/latex-sample.json">LaTeX demo &middot; 3 q / 5 min</button>
           <button class="linklike" type="button" data-sample="example-sets/boldface-demo.json">Boldface CR &middot; 3 q / 5 min</button>
           <button class="linklike" type="button" data-sample="example-sets/rc-demo.json">Reading Comp &middot; 4 q / 7 min</button>
+          <button class="linklike" type="button" data-sample="example-sets/mini-exam.json" data-exam="1">Mini full exam &middot; 3 sections / 22 min</button>
         </div>
       </div>
     </div>
@@ -86,6 +87,22 @@
       <button class="btn btn-primary" id="startBtn" type="button">Start section</button>
       <span class="hint" id="startHint"></span>
     </div>
+
+    <section class="card exam-panel" id="examPanel" aria-labelledby="examTitle">
+      <div class="eyebrow">Full exam</div>
+      <h2 id="examTitle">Run all three sections back to back</h2>
+      <p class="why">Pick one set per section and the order. You get one optional 10-minute break, section results stay hidden until the end, and the report projects a total score range with its percentile.</p>
+      <div class="exam-picks">
+        <label>Quantitative Reasoning<select id="exam_quant"></select></label>
+        <label>Verbal Reasoning<select id="exam_verbal"></select></label>
+        <label>Data Insights<select id="exam_di"></select></label>
+        <label>Section order<select id="examOrder"></select></label>
+      </div>
+      <div class="start-row">
+        <button class="btn btn-primary" id="examStartBtn" type="button" disabled>Start full exam</button>
+        <span class="hint" id="examHint"></span>
+      </div>
+    </section>
 
     <details class="loader">
       <summary>Set format reference</summary>
@@ -125,6 +142,9 @@
       <div class="palette" id="palette"></div>
     </div>
   </div>
+
+  <!-- BETWEEN SECTIONS (full exam) -->
+  <div id="screenBreak" class="hidden"></div>
 
   <!-- REPORT -->
   <div id="screenReport" class="hidden"></div>

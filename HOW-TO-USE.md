@@ -88,6 +88,14 @@ Diagnoses come from correctness plus time against target:
 
 The distinction matters because the fixes are opposite. Careless misses need a process change; content gaps need study time.
 
+### Full exam and projected total
+
+To simulate test day, use the **Full exam** panel on the setup screen. Choose a Quant, Verbal, and Data Insights set and a section order, then press **Start full exam**. Between sections you can take one 10-minute break (it auto-starts the next section when it runs out) or go straight on. Section results stay hidden until the end.
+
+The final report leads with a **projected total range** — the point estimate ±20 on the 205–805 scale — and its percentile from GMAC's August 2026 total-score table, plus each section's band and percentile. Use **View report** on any row for that section's full pacing and error analysis, and **Download JSON** for one file with everything.
+
+A single section's report also shows a projected total built from your most recent saved result in each section. It mixes days and sets, so treat it as a rough check between full exams.
+
 ## 6. Export your error log
 
 At the bottom of the report:

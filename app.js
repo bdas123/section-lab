@@ -11,7 +11,8 @@
   window.registerSet = function (set) {
     validateSet(set);
     const s = normalizeSet(set);
-    SETS.push(s);
+    const dup = SETS.findIndex((x) => x.id === s.id);
+    if (dup > -1) SETS[dup] = s; else SETS.push(s);
     selectedSetId = s.id;
     if (window.__slReady) { renderSetGrid(); updateHint(); }
     return s;
@@ -251,12 +252,14 @@
     setTimeout(() => typeset(grid), 0);
     $("startBtn").disabled = !SETS.length;
     if (!SETS.length) {
+      renderExamPanel();
       const empty = el("div", "card empty-state");
       empty.appendChild(el("div", "eyebrow", "No sets loaded"));
       empty.appendChild(el("p", null, "Nothing is timed until a set is loaded. Add a file or paste JSON above and it will appear here, ready to start."));
       grid.appendChild(empty);
       return;
     }
+    renderExamPanel();
     if (!SETS.some((s) => s.id === selectedSetId)) selectedSetId = SETS[0].id;
     SETS.forEach(function (set) {
       const b = el("button", "card set-card");
@@ -312,8 +315,8 @@
   }
 
   /* ---------------- exam flow ---------------- */
-  function startSection() {
-    const set = currentSet();
+  function startSection(setArg) {
+    const set = setArg && setArg.questions ? setArg : currentSet();
     if (!set || !set.questions.length) return;
     S.set = set;
     S.order = set.questions.map((_, i) => i);
@@ -329,8 +332,9 @@
     S.cur = 0; S.finished = false; S.paused = false;
     S.total = set.minutes * 60;
     S.remaining = S.total;
-    $("brandSub").textContent = set.section;
+    $("brandSub").textContent = EXAM ? "Section " + (EXAM.idx + 1) + " of 3 · " + set.section : set.section;
     $("screenSetup").classList.add("hidden");
+    $("screenBreak").classList.add("hidden");
     $("screenReport").classList.add("hidden");
     $("screenExam").classList.remove("hidden");
     $("timer").classList.remove("hidden");
@@ -573,7 +577,15 @@
     $("timer").classList.add("hidden");
     $("screenExam").classList.add("hidden");
     $("progressBar").style.width = "100%";
-    buildReport(expired);
+    if (EXAM) {
+      const snap = snapshot(expired);
+      EXAM.results.push(snap);
+      recordHistory(summarize(), snap);
+      if (EXAM.idx < EXAM.sets.length - 1) showBetween();
+      else { buildExamReport(); $("screenReport").classList.remove("hidden"); window.scrollTo({ top: 0 }); }
+      return;
+    }
+    buildReport(expired, { record: true });
     $("screenReport").classList.remove("hidden");
     window.scrollTo({ top: 0 });
   }
@@ -589,9 +601,8 @@
     return { tag: "Content gap", cls: "bad", note: "Wrong at roughly normal pace — the concept, not the clock." };
   }
 
-  function buildReport(expired) {
-    const root = $("screenReport");
-    root.innerHTML = "";
+  // every number the report needs, computed from the current S state
+  function summarize() {
     const rows = S.order.map(function (qi, idx) {
       const q = S.set.questions[qi];
       const a = S.answers[qi];
@@ -600,14 +611,33 @@
     });
     const n = rows.length;
     const correct = rows.filter((r) => r.correct).length;
-    const pct = Math.round((correct / n) * 100);
-    const used = S.total - S.remaining;
-    const blanks = rows.filter((r) => !r.answered).length;
-    const careless = rows.filter((r) => r.diag.tag === "Careless").length;
-    const overTarget = rows.filter((r) => r.time > r.q.target * 1.15).length;
     const est = 60 + Math.round((correct / n) * 30);
-    const band = { low: Math.max(60, est - 2), mid: est, high: Math.min(90, est + 2) };
     const ptab = percentileTableFor(S.set);
+    return {
+      rows: rows, n: n, correct: correct, pct: Math.round((correct / n) * 100),
+      used: S.total - S.remaining,
+      blanks: rows.filter((r) => !r.answered).length,
+      careless: rows.filter((r) => r.diag.tag === "Careless").length,
+      overTarget: rows.filter((r) => r.time > r.q.target * 1.15).length,
+      est: est,
+      band: { low: Math.max(60, est - 2), mid: est, high: Math.min(90, est + 2) },
+      ptab: ptab, key: ptab ? ptab.key : null
+    };
+  }
+
+  function buildReport(expired, opts) {
+    opts = opts || {};
+    const root = $("screenReport");
+    root.innerHTML = "";
+    const sm = summarize();
+    const rows = sm.rows, n = sm.n, correct = sm.correct, pct = sm.pct, used = sm.used, blanks = sm.blanks,
+      careless = sm.careless, overTarget = sm.overTarget, est = sm.est, band = sm.band, ptab = sm.ptab;
+    if (opts.record) recordHistory(sm, { set: S.set, reveal: S.reveal, pausable: S.pausable });
+    if (opts.onBack) {
+      const top = el("button", "btn btn-ghost back-link", "\u2190 Back to exam summary");
+      top.type = "button"; top.addEventListener("click", opts.onBack);
+      root.appendChild(top);
+    }
 
     // head
     const head = el("div", "report-head");
@@ -630,7 +660,7 @@
       kpis.appendChild(c);
     };
     addKpi("Estimated band", band.low + "–" + band.high,
-      ptab ? "≈ " + ordinal(pctAt(ptab, band.low)) + "–" + ordinal(pctAt(ptab, band.high)) + " percentile" : "Rough, non-adaptive estimate");
+      ptab ? pctRange(ptab, band.low, band.high) : "Rough, non-adaptive estimate");
     addKpi("Time used", fmt(used), "of " + fmt(S.total));
     addKpi("Avg per question", fmt(used / n), "target " + fmt(S.total / n));
     addKpi("Over target", overTarget + " / " + n, "spent >15% over pace");
@@ -639,6 +669,7 @@
     root.appendChild(kpis);
 
     if (ptab) root.appendChild(percentileSection(ptab, band));
+    if (!opts.onBack && ptab) { const pj = latestProjectionSection(); if (pj) root.appendChild(pj); }
     root.appendChild(bandSection(rows));
     root.appendChild(paceSection(rows));
     root.appendChild(groupSection("Accuracy by topic", rows, (r) => r.q.topic));
@@ -650,6 +681,12 @@
     again.style.display = "flex";
     again.style.gap = "var(--space-3)";
     again.style.flexWrap = "wrap";
+    if (opts.onBack) {
+      const bk = el("button", "btn btn-primary", "\u2190 Back to exam summary");
+      bk.type = "button"; bk.addEventListener("click", opts.onBack);
+      again.appendChild(bk); root.appendChild(again); typeset(root);
+      return;
+    }
     const back = el("button", "btn btn-primary", "Back to sets");
     back.type = "button";
     back.addEventListener("click", function () {
@@ -660,7 +697,7 @@
     });
     const retry = el("button", "btn", "Retake this set");
     retry.type = "button";
-    retry.addEventListener("click", function () { $("screenReport").classList.add("hidden"); startSection(); });
+    retry.addEventListener("click", function () { const again = S.set; $("screenReport").classList.add("hidden"); startSection(again); });
     again.appendChild(back); again.appendChild(retry);
     root.appendChild(again);
     typeset(root);
@@ -668,89 +705,119 @@
 
 
   /* ---------------- percentiles ---------------- */
+  function PCT() {
+    const P = window.GMAT_PERCENTILES;
+    if (P && !P.__keyed) {
+      Object.keys(P).forEach((k) => { if (P[k] && typeof P[k] === "object") P[k].key = k; });
+      Object.defineProperty(P, "__keyed", { value: true });
+    }
+    return P;
+  }
+  const SECTION_KEYS = ["quant", "verbal", "di"];
   // which GMAC table applies: set.percentileTable ("quant" | "verbal" | "di" | "none") wins, else infer from section name
   function percentileTableFor(set) {
-    const P = window.GMAT_PERCENTILES;
+    const P = PCT();
     if (!P || !set) return null;
     const key = (set.percentileTable || "").toLowerCase();
     if (key === "none") return null;
-    if (P[key]) return P[key];
+    if (SECTION_KEYS.indexOf(key) > -1 && P[key]) return P[key];
     const sec = String(set.section || "");
     if (/quant/i.test(sec)) return P.quant;
     if (/verbal/i.test(sec)) return P.verbal;
     if (/data\s*insight|^\s*di\b/i.test(sec)) return P.di;
     return null;
   }
-  const pctAt = (t, score) => t.table[Math.max(60, Math.min(90, Math.round(score)))];
+  const tMin = (t) => (t.min != null ? t.min : 60);
+  const tMax = (t) => (t.max != null ? t.max : 90);
+  const tStep = (t) => t.step || 1;
+  function snapScore(t, x) {
+    const mn = tMin(t), st = tStep(t);
+    return Math.max(mn, Math.min(tMax(t), mn + st * Math.round((x - mn) / st)));
+  }
+  const pctAt = (t, score) => t.table[snapScore(t, score)];
   const fmtPct = (t, v) => (t.decimals ? v.toFixed(t.decimals) : String(Math.round(v))) + "%";
   function ordinal(v) {
     const n = Math.round(v);
     if (n >= 100) return "99th+";
+    if (n < 1) return "<1st";
     const s = n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th";
     return n + s;
   }
+  // "≈ 75th–91st percentile", collapsing to one value when both ends round the same
+  function pctRange(t, lo, hi) {
+    const a = ordinal(pctAt(t, lo)), b = ordinal(pctAt(t, hi));
+    return "\u2248 " + (a === b ? a : a + "\u2013" + b) + " percentile";
+  }
+  function spanWords(t, lo, hi) {
+    const a = ordinal(pctAt(t, lo)), b = ordinal(pctAt(t, hi));
+    return a === b ? "sits around the " + a + " percentile" : "spans roughly the " + a + " to " + b + " percentile";
+  }
+  const article = (n) => (/^(8|11|18)/.test(String(n)) ? "an " : "a ");
   // share of test takers at each exact score, from the "percent below" table
   function shareAt(t, s) {
-    const below = t.table[s], next = s < 90 ? t.table[s + 1] : 100;
+    const st = tStep(t), below = t.table[s], next = s < tMax(t) ? t.table[s + st] : 100;
     let v = Math.max(0, next - below);
-    if (s === 60) v += below; // fold the floor into the lowest score
+    if (s === tMin(t)) v += below; // fold the floor into the lowest score
     return v;
   }
 
-  function percentileSection(t, band) {
+  // histogram of the recent score distribution with a highlighted band, plus a low / point / high readout
+  function percentileSection(t, band, o) {
+    o = o || {};
     const s = el("section", "block pct-block");
-    s.appendChild(el("h2", null, "Where your band sits among test takers"));
-    const pMid = pctAt(t, band.mid);
+    s.appendChild(el("h2", null, o.title || "Where your band sits among test takers"));
     const lead = el("p", "why no-format");
-    lead.textContent = "On the " + t.label + " scale, " + (/^8/.test(String(band.mid)) ? "an " : "a ") + band.mid + " scores higher than about " + fmtPct(t, pMid) +
-      " of recent test takers. Your band of " + band.low + "–" + band.high + " spans roughly the " +
-      ordinal(pctAt(t, band.low)) + " to " + ordinal(pctAt(t, band.high)) + " percentile.";
+    lead.textContent = o.lead || ("On the " + t.label + " scale, " + article(band.mid) + band.mid + " scores higher than about " +
+      fmtPct(t, pctAt(t, band.mid)) + " of recent test takers. Your band of " + band.low + "–" + band.high + " " + spanWords(t, band.low, band.high) + ".");
     s.appendChild(lead);
 
-    // histogram of the recent score distribution, band highlighted
+    const mn = tMin(t), mx = tMax(t), st = tStep(t);
     const W = 640, H = 210, padL = 34, padR = 10, padT = 26, padB = 30;
-    const scores = []; for (let x = 60; x <= 90; x++) scores.push(x);
+    const scores = []; for (let x = mn; x <= mx; x += st) scores.push(x);
     const shares = scores.map((x) => shareAt(t, x));
-    const maxShare = Math.max.apply(null, shares) * 1.12;
+    const top = Math.max.apply(null, shares);
+    const maxShare = top * 1.12;
     const bw = (W - padL - padR) / scores.length;
     const y = (v) => padT + (H - padT - padB) * (1 - v / maxShare);
+    const idx = (sc) => Math.round((sc - mn) / st);
     const NS = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(NS, "svg");
     svg.setAttribute("viewBox", "0 0 " + W + " " + H);
     svg.setAttribute("class", "pct-chart");
     svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", "Distribution of " + t.label + " scores with your estimated band " + band.low + " to " + band.high + " highlighted");
+    svg.setAttribute("aria-label", "Distribution of " + t.label + " with the range " + band.low + " to " + band.high + " highlighted");
     const mk = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.appendChild(e); return e; };
-    const x0 = padL + (band.low - 60) * bw, x1 = padL + (band.high - 60 + 1) * bw;
+    const x0 = padL + idx(band.low) * bw, x1 = padL + (idx(band.high) + 1) * bw;
     mk("rect", { x: x0, y: padT - 18, width: x1 - x0, height: H - padB - padT + 18, class: "pct-bandbg", rx: 4 });
-    mk("text", { x: (x0 + x1) / 2, y: padT - 6, "text-anchor": "middle", class: "pct-bandlbl" }, "your band");
+    mk("text", { x: Math.min(W - padR - 30, Math.max(padL + 30, (x0 + x1) / 2)), y: padT - 6, "text-anchor": "middle", class: "pct-bandlbl" }, o.bandLabel || "your band");
     [0, 0.5, 1].forEach(function (f) {
-      const v = maxShare / 1.12 * f, yy = y(v);
+      const v = top * f, yy = y(v);
       mk("line", { x1: padL, x2: W - padR, y1: yy, y2: yy, class: "pct-grid" });
-      mk("text", { x: padL - 6, y: yy + 3, "text-anchor": "end", class: "pct-axis" }, Math.round(v) + "%");
+      mk("text", { x: padL - 6, y: yy + 3, "text-anchor": "end", class: "pct-axis" }, (v < 10 && v > 0 ? v.toFixed(1) : Math.round(v)) + "%");
     });
+    const labelEvery = o.labelEvery || 5;
     scores.forEach(function (sc, i) {
       const v = shares[i], inBand = sc >= band.low && sc <= band.high;
-      const r = mk("rect", { x: padL + i * bw + 1.5, y: y(v), width: bw - 3, height: Math.max(0.5, H - padB - y(v)), rx: 2,
+      const r = mk("rect", { x: padL + i * bw + (bw > 8 ? 1.5 : 0.6), y: y(v), width: Math.max(1, bw - (bw > 8 ? 3 : 1.2)), height: Math.max(0.5, H - padB - y(v)), rx: bw > 8 ? 2 : 1,
         class: "pct-bar" + (inBand ? " in" : "") + (sc === band.mid ? " mid" : "") });
       const tt = document.createElementNS(NS, "title");
       tt.textContent = "Score " + sc + ": " + v.toFixed(t.decimals ? 1 : 0) + "% of test takers · percentile " + fmtPct(t, t.table[sc]);
       r.appendChild(tt);
-      if (sc % 5 === 0) mk("text", { x: padL + i * bw + bw / 2, y: H - padB + 16, "text-anchor": "middle", class: "pct-axis" }, String(sc));
+      if ((sc - mn) % labelEvery === 0 || (labelEvery === 5 && sc % 5 === 0 && mn % 5 === 0)) {
+        mk("text", { x: padL + i * bw + bw / 2, y: H - padB + 16, "text-anchor": "middle", class: "pct-axis" }, String(sc));
+      }
     });
-    mk("text", { x: W - padR, y: H - 2, "text-anchor": "end", class: "pct-axis" }, "section score →");
+    mk("text", { x: W - padR, y: H - 2, "text-anchor": "end", class: "pct-axis" }, (o.axis || "section score") + " →");
     const wrap = el("div", "pct-wrap"); wrap.appendChild(svg); s.appendChild(wrap);
-    // on narrow screens the chart scrolls sideways; start it centred on the band
     requestAnimationFrame(function () {
       if (wrap.scrollWidth <= wrap.clientWidth) return;
       const scale = svg.getBoundingClientRect().width / W;
       wrap.scrollLeft = ((x0 + x1) / 2) * scale - wrap.clientWidth / 2;
     });
 
-    // readout
     const tbl = el("table", "data pct-table");
     const th = el("thead"), hr = el("tr");
-    ["", "Section score", "Percentile", "Ahead of"].forEach((h) => hr.appendChild(el("th", null, h)));
+    ["", o.scoreHeader || "Section score", "Percentile", "Ahead of"].forEach((h) => hr.appendChild(el("th", null, h)));
     th.appendChild(hr); tbl.appendChild(th);
     const tb = el("tbody");
     [["Low end", band.low], ["Point estimate", band.mid], ["High end", band.high]].forEach(function (pair) {
@@ -765,12 +832,351 @@
     tbl.appendChild(tb); s.appendChild(tbl);
 
     const note = el("p", "pct-note");
-    note.appendChild(document.createTextNode("Percentile = share of test takers who scored below that section score. Source: "));
+    note.appendChild(document.createTextNode("Percentile = share of test takers who scored below that score. Source: "));
     const a = el("a", null, t.source); a.href = t.url; a.target = "_blank"; a.rel = "noopener";
     note.appendChild(a);
-    note.appendChild(document.createTextNode(". The band itself comes from raw accuracy on a fixed, non-adaptive set, so treat the percentile as a direction check, not a prediction of your official score."));
+    note.appendChild(document.createTextNode(". " + (o.caveat || "The band itself comes from raw accuracy on a fixed, non-adaptive set, so treat the percentile as a direction check, not a prediction of your official score.")));
     s.appendChild(note);
     return s;
+  }
+
+  /* ---------------- projected total score ---------------- */
+  // GMAT Focus total (205–805, ends in 5) from three equally weighted 60–90 section scores:
+  // (Q + V + DI − 180) × 20/3 + 205, rounded to the nearest valid total. GMAC doesn't publish its exact
+  // conversion, but this reproduces official score reports to within a step in practice.
+  function totalFromSections(sum) {
+    return Math.max(205, Math.min(805, 205 + 10 * Math.round(((sum - 180) * 2) / 3)));
+  }
+  // each section estimate is ±2; three independent errors combine to about ±3.5 section points ≈ ±20 total points
+  const TOTAL_HALF_WIDTH = 20;
+  function projectTotal(bands) {
+    const sum = bands.reduce((a, b) => a + b.mid, 0);
+    const mid = totalFromSections(sum);
+    return { low: Math.max(205, mid - TOTAL_HALF_WIDTH), mid: mid, high: Math.min(805, mid + TOTAL_HALF_WIDTH), sum: sum };
+  }
+
+  /* ---------------- section history (this browser only) ---------------- */
+  const HKEY = "sectionlab.history.v1";
+  function readHistory() {
+    try { const h = JSON.parse(localStorage.getItem(HKEY) || "[]"); return Array.isArray(h) ? h : []; }
+    catch (e) { return []; }
+  }
+  function recordHistory(sm, ctx) {
+    if (!sm.key) return;
+    const h = readHistory();
+    h.push({
+      at: new Date().toISOString(), date: localDate(), key: sm.key,
+      section: ctx.set.section, set: ctx.set.title, setId: ctx.set.id,
+      correct: sm.correct, questions: sm.n, low: sm.band.low, mid: sm.band.mid, high: sm.band.high,
+      practice: !!(ctx.reveal || ctx.pausable), fullExam: !!EXAM
+    });
+    try { localStorage.setItem(HKEY, JSON.stringify(h.slice(-200))); } catch (e) { /* storage full or blocked */ }
+  }
+  function latestBySection() {
+    const h = readHistory(), out = {};
+    h.forEach((e) => { if (SECTION_KEYS.indexOf(e.key) > -1) out[e.key] = e; });
+    return out;
+  }
+
+  // on a single-section report: project a total from the latest saved result for each section
+  function latestProjectionSection() {
+    const P = PCT(); if (!P || !P.total) return null;
+    const last = latestBySection();
+    const s = el("section", "block proj-block");
+    s.appendChild(el("h2", null, "Projected total score"));
+    const missing = SECTION_KEYS.filter((k) => !last[k]);
+    if (missing.length) {
+      const p = el("p", "why no-format");
+      p.textContent = "A projected total needs a recent result in all three sections. Still missing: " +
+        missing.map((k) => P[k].label).join(", ") + ". Take those sections here, or run a full three-section exam from the setup screen.";
+      s.appendChild(p);
+      return s;
+    }
+    const bands = SECTION_KEYS.map((k) => last[k]);
+    const pj = projectTotal(bands);
+    const T = P.total;
+    const head = el("div", "proj-head");
+    head.appendChild(el("div", "proj-range", pj.low + "–" + pj.high));
+    head.appendChild(el("div", "proj-sub no-format", "Point estimate " + pj.mid + " · about the " + ordinal(pctAt(T, pj.mid)) +
+      " percentile (range " + ordinal(pctAt(T, pj.low)) + "–" + ordinal(pctAt(T, pj.high)) + ")"));
+    s.appendChild(head);
+    const tbl = el("table", "data");
+    const hr = el("tr"); ["Section", "Latest set", "Date", "Estimate"].forEach((h) => hr.appendChild(el("th", null, h)));
+    const th = el("thead"); th.appendChild(hr); tbl.appendChild(th);
+    const tb = el("tbody");
+    SECTION_KEYS.forEach(function (k) {
+      const e = last[k], tr = el("tr");
+      tr.appendChild(el("td", null, P[k].label));
+      tr.appendChild(el("td", null, e.set + (e.practice ? " (practice mode)" : "")));
+      tr.appendChild(el("td", "mono", e.date));
+      tr.appendChild(el("td", "mono", e.mid + " (" + e.low + "–" + e.high + ")"));
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb); s.appendChild(tbl);
+    const note = el("p", "pct-note");
+    note.textContent = "Combines your most recent result in each section, which may come from different days and sets. A full three-section exam gives a cleaner projection. Results are saved only in this browser. ";
+    const clr = el("button", "linklike", "Clear saved results");
+    clr.type = "button";
+    clr.addEventListener("click", function () {
+      if (!confirm("Clear every saved section result in this browser?")) return;
+      try { localStorage.removeItem(HKEY); } catch (e) { /* ignore */ }
+      s.replaceWith(latestProjectionSection() || el("div"));
+    });
+    note.appendChild(clr);
+    s.appendChild(note);
+    return s;
+  }
+
+  /* ---------------- full three-section exam ---------------- */
+  let EXAM = null;
+  const ORDERS = [["quant", "verbal", "di"], ["quant", "di", "verbal"], ["verbal", "quant", "di"], ["verbal", "di", "quant"], ["di", "quant", "verbal"], ["di", "verbal", "quant"]];
+  const SHORT = { quant: "Quant", verbal: "Verbal", di: "Data Insights" };
+  const BREAK_SECONDS = 600;
+
+  function renderExamPanel() {
+    const panel = $("examPanel"); if (!panel) return;
+    const P = PCT();
+    let ready = !!P;
+    SECTION_KEYS.forEach(function (k) {
+      const sel = $("exam_" + k);
+      const prev = sel.value;
+      sel.innerHTML = "";
+      const opts = SETS.filter((set) => { const t = percentileTableFor(set); return t && t.key === k; });
+      if (!opts.length) { const o = el("option", null, "No " + SHORT[k] + " set loaded"); o.value = ""; sel.appendChild(o); sel.disabled = true; ready = false; return; }
+      sel.disabled = false;
+      opts.forEach(function (set) {
+        const o = el("option", null, set.title + " · " + set.questions.length + " q / " + set.minutes + " min");
+        o.value = set.id; sel.appendChild(o);
+      });
+      sel.value = opts.some((x) => x.id === prev) ? prev : opts[opts.length - 1].id;
+    });
+    const ord = $("examOrder");
+    if (!ord.options.length) ORDERS.forEach(function (o, i) { const op = el("option", null, o.map((k) => SHORT[k]).join(" \u2192 ")); op.value = String(i); ord.appendChild(op); });
+    $("examStartBtn").disabled = !ready;
+    const sets = ready ? SECTION_KEYS.map((k) => SETS.find((x) => x.id === $("exam_" + k).value)) : [];
+    $("examHint").textContent = ready
+      ? sets.reduce((a, x) => a + x.questions.length, 0) + " questions · " + sets.reduce((a, x) => a + x.minutes, 0) + " min + optional 10-min break"
+      : "Load one Quant, one Verbal, and one Data Insights set to enable.";
+  }
+
+  function startFullExam() {
+    const order = ORDERS[Number($("examOrder").value) || 0];
+    const sets = order.map((k) => SETS.find((x) => x.id === $("exam_" + k).value));
+    if (sets.some((x) => !x)) return;
+    EXAM = { order: order, sets: sets, idx: 0, breakUsed: false, results: [], startedAt: new Date().toISOString() };
+    startSection(sets[0]);
+  }
+
+  function snapshot(expired) {
+    return {
+      set: S.set, order: S.order.slice(), answers: JSON.parse(JSON.stringify(S.answers)),
+      times: Object.assign({}, S.times), flags: Object.assign({}, S.flags),
+      total: S.total, remaining: S.remaining, reveal: S.reveal, pausable: S.pausable, expired: !!expired
+    };
+  }
+  function restore(snap) {
+    S.set = snap.set; S.order = snap.order; S.answers = snap.answers; S.times = snap.times; S.flags = snap.flags;
+    S.total = snap.total; S.remaining = snap.remaining; S.reveal = snap.reveal; S.pausable = snap.pausable;
+    S.cur = 0; S.finished = true;
+  }
+
+  let breakTick = null;
+  function showBetween() {
+    const box = $("screenBreak");
+    box.innerHTML = "";
+    const done = EXAM.sets[EXAM.idx], next = EXAM.sets[EXAM.idx + 1];
+    const card = el("div", "card break-card");
+    card.appendChild(el("div", "eyebrow", "Section " + (EXAM.idx + 1) + " of 3 complete"));
+    card.appendChild(el("h1", null, done.section + " is submitted"));
+    card.appendChild(el("p", "why", "Results stay hidden until all three sections are done, as on the real exam. Next up: " +
+      next.section + " \u2014 " + next.questions.length + " questions in " + next.minutes + " minutes."));
+    const clock = el("div", "break-clock mono hidden", fmt(BREAK_SECONDS));
+    card.appendChild(clock);
+    const row = el("div", "break-actions");
+    const go = el("button", "btn btn-primary", "Start " + SHORT[percentileTableFor(next).key] + " section");
+    go.type = "button";
+    go.addEventListener("click", nextSection);
+    row.appendChild(go);
+    if (!EXAM.breakUsed) {
+      const br = el("button", "btn", "Take the 10-minute break");
+      br.type = "button";
+      br.addEventListener("click", function () {
+        EXAM.breakUsed = true;
+        br.remove();
+        clock.classList.remove("hidden");
+        go.textContent = "End break and start " + SHORT[percentileTableFor(next).key];
+        const end = performance.now() + BREAK_SECONDS * 1000;
+        breakTick = setInterval(function () {
+          const left = Math.max(0, (end - performance.now()) / 1000);
+          clock.textContent = fmt(left);
+          clock.dataset.state = left <= 60 ? "crit" : left <= 120 ? "warn" : "ok";
+          if (left <= 0) nextSection();
+        }, 250);
+      });
+      row.appendChild(br);
+    } else {
+      row.appendChild(el("span", "hint", "Break already used."));
+    }
+    card.appendChild(row);
+    const quit = el("button", "linklike quit-exam", "Quit the full exam");
+    quit.type = "button";
+    quit.addEventListener("click", function () {
+      if (!confirm("Quit the full exam? Completed sections stay in your saved results, but no total is projected.")) return;
+      if (breakTick) { clearInterval(breakTick); breakTick = null; }
+      EXAM = null;
+      box.classList.add("hidden");
+      $("screenSetup").classList.remove("hidden");
+      $("progressBar").style.width = "0%";
+      $("brandSub").textContent = "Timed GMAT section trainer";
+    });
+    card.appendChild(quit);
+    box.appendChild(card);
+    box.classList.remove("hidden");
+    $("brandSub").textContent = "Full exam \u00b7 between sections";
+    window.scrollTo({ top: 0 });
+  }
+  function nextSection() {
+    if (breakTick) { clearInterval(breakTick); breakTick = null; }
+    if (!EXAM) return;
+    EXAM.idx++;
+    startSection(EXAM.sets[EXAM.idx]);
+  }
+
+  function buildExamReport() {
+    const P = PCT(), T = P.total;
+    const root = $("screenReport");
+    root.innerHTML = "";
+    $("brandSub").textContent = "Full exam \u00b7 results";
+    const secs = EXAM.results.map(function (snap) { restore(snap); const sm = summarize(); return { snap: snap, sm: sm }; });
+    const byKey = {}; secs.forEach((x) => { byKey[x.sm.key] = x; });
+    const pj = projectTotal(SECTION_KEYS.map((k) => byKey[k].sm.band));
+    const usedAll = secs.reduce((a, x) => a + x.sm.used, 0), totalAll = secs.reduce((a, x) => a + x.snap.total, 0);
+    const practice = secs.some((x) => x.snap.reveal || x.snap.pausable);
+
+    const head = el("div", "report-head");
+    const left = el("div");
+    left.appendChild(el("div", "eyebrow", "Full exam \u00b7 " + localDate() + " \u00b7 " + EXAM.order.map((k) => SHORT[k]).join(" \u2192 ")));
+    left.appendChild(el("h1", "score-big", "Projected total " + pj.low + "\u2013" + pj.high));
+    const lead = el("p", "why no-format");
+    lead.textContent = "Point estimate " + pj.mid + ", ahead of about " + fmtPct(T, pctAt(T, pj.mid)) + " of recent test takers. Built from your three section estimates: " +
+      SECTION_KEYS.map((k) => SHORT[k] + " " + byKey[k].sm.band.mid).join(" \u00b7 ") + "." + (practice ? " Practice-mode options were on for at least one section, so read this loosely." : "");
+    left.appendChild(lead);
+    head.appendChild(left);
+    root.appendChild(head);
+
+    const kpis = el("div", "kpis");
+    const addKpi = (k, v, sub) => { const c = el("div", "kpi"); c.appendChild(el("div", "k", k)); c.appendChild(el("div", "v", v)); if (sub) c.appendChild(el("div", "sub", sub)); kpis.appendChild(c); };
+    addKpi("Projected total", pj.low + "\u2013" + pj.high, pctRange(T, pj.low, pj.high));
+    addKpi("Point estimate", String(pj.mid), ordinal(pctAt(T, pj.mid)) + " percentile");
+    SECTION_KEYS.forEach(function (k) {
+      const b = byKey[k].sm.band, t = P[k];
+      addKpi(SHORT[k], b.low + "\u2013" + b.high, pctRange(t, b.low, b.high));
+    });
+    addKpi("Time used", fmt(usedAll), "of " + fmt(totalAll) + (EXAM.breakUsed ? " + break" : ", no break"));
+    root.appendChild(kpis);
+
+    root.appendChild(percentileSection(T, pj, {
+      title: "Where the projected total sits among test takers",
+      lead: "On the 205\u2013805 total scale, " + article(pj.mid) + pj.mid + " scores higher than about " + fmtPct(T, pctAt(T, pj.mid)) +
+        " of recent test takers. The projected range of " + pj.low + "\u2013" + pj.high + " " + spanWords(T, pj.low, pj.high) + ".",
+      axis: "total score", scoreHeader: "Total score", bandLabel: "projected range", labelEvery: 100,
+      caveat: "The projection adds up rough, non-adaptive section estimates, so use it to track direction between full exams, not as a prediction of your official score."
+    }));
+
+    // section breakdown
+    const bs = el("section", "block");
+    bs.appendChild(el("h2", null, "Section by section"));
+    const tbl = el("table", "data exam-table");
+    const hr = el("tr"); ["#", "Section", "Set", "Correct", "Estimate", "Percentile", "Time", ""].forEach((h) => hr.appendChild(el("th", null, h)));
+    const th = el("thead"); th.appendChild(hr); tbl.appendChild(th);
+    const tb = el("tbody");
+    secs.forEach(function (x, i) {
+      const t = P[x.sm.key], b = x.sm.band, tr = el("tr");
+      tr.appendChild(el("td", "mono", String(i + 1)));
+      tr.appendChild(el("td", null, t.label));
+      tr.appendChild(el("td", null, x.snap.set.title));
+      tr.appendChild(el("td", "mono", x.sm.correct + "/" + x.sm.n));
+      tr.appendChild(el("td", "mono", b.mid + " (" + b.low + "\u2013" + b.high + ")"));
+      tr.appendChild(el("td", "mono", ordinal(pctAt(t, b.mid))));
+      tr.appendChild(el("td", "mono", fmt(x.sm.used) + (x.snap.expired ? " \u00b7 expired" : "")));
+      const td = el("td"); const v = el("button", "btn btn-ghost", "View report"); v.type = "button";
+      v.addEventListener("click", function () { restore(x.snap); buildReport(x.snap.expired, { onBack: function () { buildExamReport(); window.scrollTo({ top: 0 }); } }); window.scrollTo({ top: 0 }); });
+      td.appendChild(v); tr.appendChild(td);
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);
+    const tw = el("div", "table-scroll"); tw.appendChild(tbl); bs.appendChild(tw);
+    root.appendChild(bs);
+
+    // method
+    const ms = el("section", "block");
+    ms.appendChild(el("h2", null, "How the projection works"));
+    const ul = el("ul", "method no-format");
+    [
+      "Each section estimate is 60 + accuracy \u00d7 30, with a \u00b12 band. It's non-adaptive: the real exam weighs question difficulty, which a fixed set can't.",
+      "The three point estimates are combined on GMAC's total scale: (Quant + Verbal + DI \u2212 180) \u00d7 20/3 + 205, rounded to the nearest total ending in 5. Sections count equally.",
+      "The \u00b12 errors in each section partly cancel, so the total range is the point estimate \u00b120 rather than the full \u00b140.",
+      "Percentiles come from GMAC's August 2026 tables (exams July 2021 \u2013 June 2026): the share of test takers who scored below that score."
+    ].forEach((t) => ul.appendChild(el("li", null, t)));
+    ms.appendChild(ul);
+    root.appendChild(ms);
+
+    // export
+    const ex = el("section", "block");
+    ex.appendChild(el("h2", null, "Full-exam log"));
+    ex.appendChild(el("p", "why", "One JSON file with the projected total and every section's error log, for the workbook."));
+    const log = {
+      exportedAt: new Date().toISOString(), date: localDate(), type: "full-exam", order: EXAM.order.map((k) => P[k].label), breakTaken: EXAM.breakUsed,
+      projectedTotal: {
+        low: pj.low, mid: pj.mid, high: pj.high,
+        percentile: { low: pctAt(T, pj.low), mid: pctAt(T, pj.mid), high: pctAt(T, pj.high) },
+        sectionSum: pj.sum, method: "(Q+V+DI-180)*20/3+205, rounded to a total ending in 5; range = point estimate ±20",
+        source: T.source, sourceUrl: T.url
+      },
+      sections: secs.map(function (x) {
+        restore(x.snap);
+        return buildLogObject(x.sm.rows, { n: x.sm.n, correct: x.sm.correct, pct: x.sm.pct, used: x.sm.used, blanks: x.sm.blanks, careless: x.sm.careless, overTarget: x.sm.overTarget, est: x.sm.est, band: x.sm.band, ptab: x.sm.ptab, expired: x.snap.expired });
+      })
+    };
+    const jsonText = JSON.stringify(log, null, 2);
+    const acts = el("div", "export-actions");
+    const dl = el("button", "btn btn-primary", "Download JSON"); dl.type = "button";
+    const msg = el("span", "hint");
+    dl.addEventListener("click", function () {
+      try {
+        const blob = new Blob([jsonText], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = localDate() + "-full-exam-log.json";
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      } catch (e) { msg.textContent = "Download blocked here \u2014 use Copy JSON instead."; }
+    });
+    const cp = el("button", "btn", "Copy JSON"); cp.type = "button";
+    cp.addEventListener("click", () => copyText(jsonText, cp, "Copy JSON"));
+    acts.appendChild(dl); acts.appendChild(cp); acts.appendChild(msg);
+    ex.appendChild(acts);
+    root.appendChild(ex);
+
+    const again = el("div", "break-actions");
+    const back = el("button", "btn btn-primary", "Back to sets"); back.type = "button";
+    back.addEventListener("click", function () {
+      EXAM = null;
+      $("screenReport").classList.add("hidden");
+      $("screenSetup").classList.remove("hidden");
+      $("progressBar").style.width = "0%";
+      $("brandSub").textContent = "Timed GMAT section trainer";
+      renderExamPanel();
+    });
+    const retry = el("button", "btn", "Retake full exam"); retry.type = "button";
+    retry.addEventListener("click", function () {
+      const order = EXAM.order, sets = EXAM.sets;
+      EXAM = { order: order, sets: sets, idx: 0, breakUsed: false, results: [], startedAt: new Date().toISOString() };
+      $("screenReport").classList.add("hidden");
+      startSection(sets[0]);
+    });
+    again.appendChild(back); again.appendChild(retry);
+    root.appendChild(again);
+    typeset(root);
   }
 
   function bandSection(rows) {
@@ -1131,7 +1537,10 @@
     initTheme();
     renderSetGrid();
     updateHint();
-    $("startBtn").addEventListener("click", startSection);
+    $("startBtn").addEventListener("click", function () { EXAM = null; startSection(); });
+    $("examStartBtn").addEventListener("click", startFullExam);
+    SECTION_KEYS.forEach((k) => $("exam_" + k).addEventListener("change", renderExamPanel));
+    renderExamPanel();
     $("nextBtn").addEventListener("click", function () {
       if (S.cur === S.order.length - 1) finish(false); else goTo(S.cur + 1);
     });
@@ -1173,7 +1582,8 @@
           .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
           .then(function (text) {
             const n = addSetsFromText(text, path);
-            loadMsg(label + " loaded and selected.", false);
+            loadMsg(label + " loaded" + (b.dataset.exam ? " \u2014 ready in the Full exam panel below." : " and selected."), false);
+            if (b.dataset.exam) { renderExamPanel(); $("examPanel").scrollIntoView({ behavior: "smooth", block: "center" }); }
             return n;
           })
           .catch(function (e) {

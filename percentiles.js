@@ -9,6 +9,9 @@
    (whole percents; GMAC does not publish a DI concordance PDF because the old exam had no DI section).
      https://gmatclub.com/forum/gmat-percentiles-updated-aug-2026-full-analysis-461144.html
 
+   Total score: GMAC Total Score Concordance Table, published Aug 2026, same data period.
+     https://go.gmac.com/hubfs/07.Assessments/GMAT%20Exam/GMAT_Total_Concordance_Aug2026.pdf
+
    GMAC refreshes these every year in Q3. To update, replace the numbers below. */
 window.GMAT_PERCENTILES = {
   quant: {
@@ -31,5 +34,12 @@ window.GMAT_PERCENTILES = {
     url: "https://gmatclub.com/forum/gmat-percentiles-updated-aug-2026-full-analysis-461144.html",
     decimals: 0,
     table: { 60: 3, 61: 4, 62: 5, 63: 5, 64: 7, 65: 8, 66: 10, 67: 11, 68: 14, 69: 17, 70: 20, 71: 24, 72: 29, 73: 34, 74: 40, 75: 46, 76: 52, 77: 61, 78: 69, 79: 76, 80: 83, 81: 88, 82: 93, 83: 95, 84: 97, 85: 98, 86: 99, 87: 99, 88: 99, 89: 100, 90: 100 }
+  },
+  total: {
+    label: "Total Score",
+    source: "GMAC total-score concordance table, Aug 2026 (exams Jul 2021 – Jun 2026)",
+    url: "https://go.gmac.com/hubfs/07.Assessments/GMAT%20Exam/GMAT_Total_Concordance_Aug2026.pdf",
+    decimals: 1, min: 205, max: 805, step: 10,
+    table: { 205: 0.2, 215: 0.3, 225: 0.3, 235: 0.4, 245: 0.4, 255: 0.6, 265: 0.7, 275: 0.9, 285: 1.0, 295: 1.3, 305: 1.5, 315: 2.0, 325: 2.2, 335: 2.8, 345: 3.1, 355: 3.9, 365: 4.3, 375: 5.2, 385: 5.8, 395: 7.0, 405: 7.7, 415: 9.3, 425: 10.2, 435: 12.1, 445: 13.2, 455: 15.7, 465: 17.1, 475: 20.1, 485: 21.7, 495: 25.4, 505: 27.3, 515: 31.6, 525: 34.0, 535: 39.1, 545: 41.7, 555: 47.4, 565: 50.4, 575: 56.7, 585: 59.9, 595: 66.3, 605: 69.4, 615: 75.4, 625: 78.2, 635: 80.9, 645: 85.6, 655: 89.6, 665: 91.2, 675: 94.0, 685: 95.1, 695: 96.9, 705: 97.5, 715: 98.6, 725: 98.9, 735: 99.4, 745: 99.6, 755: 99.8, 765: 99.9, 775: 100.0, 785: 100.0, 795: 100.0, 805: 100.0 }
   }
 };
