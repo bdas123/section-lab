@@ -31,7 +31,7 @@ The review table diagnoses every question, and the pacing curve shows cumulative
 - **Bold, italics, underline.** `**bold**`, `\textbf{}`, `\emph{}`, `\underline{}` in any text field — enough for Critical Reasoning boldface questions.
 - **Reading comprehension.** Multi-paragraph passages defined once and shared across questions, shown beside the question on wide screens.
 - **Flags, palette, keyboard shortcuts.** `A`–`E` to answer, arrows to move, `F` to flag.
-- **Post-section report.** Accuracy, rough score band, pacing curve against an even-pace benchmark, accuracy by topic and difficulty, a per-question review table with diagnosis, and collapsible solutions.
+- **Post-section report.** Accuracy, rough score band with its percentile against GMAC's latest distribution (Aug 2026 tables), pacing curve against an even-pace benchmark, accuracy by topic and difficulty, a per-question review table with diagnosis, and collapsible solutions.
 - **Error log export.** Download the flagged questions as JSON, or copy a tab-separated block that pastes straight into a spreadsheet error log.
 - **Practice mode.** Optional pausing, answer reveal after each question, and shuffled question order.
 - **Dark mode.**
@@ -105,6 +105,8 @@ Each question is classified from correctness and time against its target:
 | Unanswered | No answer recorded |
 
 The score band in the report is a rough, non-adaptive approximation from raw accuracy. It is useful for tracking your own trend, not for predicting an official score.
+
+The report places that band on the recent test-taker distribution for the section: a histogram of section scores with your band highlighted, and the percentile at the low, point, and high ends. Quant and Verbal use GMAC's August 2026 concordance tables (exams July 2021 – June 2026, to the tenth of a percent); Data Insights uses the same August 2026 update in whole percents. The numbers live in `percentiles.js` — GMAC refreshes them every Q3, so update that file when new tables come out.
 
 ## Project layout
 

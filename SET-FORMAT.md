@@ -1,6 +1,6 @@
 # Question set format (Section Lab)
 
-No sets ship with the app. Any section works — Quant, Verbal, Data Insights — as long as the set follows this shape. On the setup screen, drop a `.json` file onto the loader (or pick it with Choose file), or paste the JSON and press Add set. A file may hold one set object or an array of sets. Two ready-made sets are in `example-sets/`.
+No sets ship with the app. Any section works — Quant, Verbal, Data Insights — as long as the set follows this shape. On the setup screen, drop a `.json` file onto the loader (or pick it with Choose file), or paste the JSON and press Add set. A file may hold one set object or an array of sets. Ready-made sets are in `example-sets/`.
 
 ```json
 {
@@ -14,6 +14,8 @@ No sets ship with the app. Any section works — Quant, Verbal, Data Insights �
 ```
 
 `minutes` is the whole-section countdown. Anything malformed is rejected on load with the reason, so a bad set never starts a timed section.
+
+`section` also picks the percentile table the report uses: a name containing "Quant", "Verbal", or "Data Insights" maps to that section's official distribution. To override, add `"percentileTable": "quant"`, `"verbal"`, `"di"`, or `"none"` (hides the percentile panel, e.g. for mixed drills).
 
 ## Question fields
 

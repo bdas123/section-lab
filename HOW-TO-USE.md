@@ -67,6 +67,7 @@ Work it like the real thing: do not look anything up, and do not pause on a time
 The report is built to answer one question — where did the points actually go?
 
 - **Headline** — raw correct count and percentage, plus a rough score band. The band is a non-adaptive approximation, so use it to track your own trend, not to predict an official score.
+- **Where your band sits among test takers** — the band placed on GMAC's latest section-score distribution (August 2026), with the percentile at each end. Hover a bar to see the share of test takers at that score. The JSON export includes these percentiles under `summary.estimatedPercentile`.
 - **Six cards** — time used, average per question versus target, questions over target, careless misses, and unanswered.
 - **What actually cost you points** — every miss and slow solve grouped by cause, so you can see at a glance whether the section was a knowledge problem or a clock problem.
 - **Pacing curve** — your cumulative time against an even-pace benchmark. Above the dashed line means you are behind schedule. Red dots mark misses, which usually cluster right after a time sink.

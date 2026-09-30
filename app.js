@@ -606,6 +606,8 @@
     const careless = rows.filter((r) => r.diag.tag === "Careless").length;
     const overTarget = rows.filter((r) => r.time > r.q.target * 1.15).length;
     const est = 60 + Math.round((correct / n) * 30);
+    const band = { low: Math.max(60, est - 2), mid: est, high: Math.min(90, est + 2) };
+    const ptab = percentileTableFor(S.set);
 
     // head
     const head = el("div", "report-head");
@@ -627,7 +629,8 @@
       if (sub) c.appendChild(el("div", "sub", sub));
       kpis.appendChild(c);
     };
-    addKpi("Estimated band", (est - 2) + "–" + (est + 2), "Rough, non-adaptive estimate");
+    addKpi("Estimated band", band.low + "–" + band.high,
+      ptab ? "≈ " + ordinal(pctAt(ptab, band.low)) + "–" + ordinal(pctAt(ptab, band.high)) + " percentile" : "Rough, non-adaptive estimate");
     addKpi("Time used", fmt(used), "of " + fmt(S.total));
     addKpi("Avg per question", fmt(used / n), "target " + fmt(S.total / n));
     addKpi("Over target", overTarget + " / " + n, "spent >15% over pace");
@@ -635,12 +638,13 @@
     addKpi("Unanswered", String(blanks), blanks ? "pure pacing loss" : "nothing left blank");
     root.appendChild(kpis);
 
+    if (ptab) root.appendChild(percentileSection(ptab, band));
     root.appendChild(bandSection(rows));
     root.appendChild(paceSection(rows));
     root.appendChild(groupSection("Accuracy by topic", rows, (r) => r.q.topic));
     root.appendChild(groupSection("Accuracy by difficulty", rows, (r) => r.q.diff));
     root.appendChild(reviewSection(rows));
-    root.appendChild(exportSection(rows, { correct: correct, n: n, pct: pct, used: used, blanks: blanks, careless: careless, overTarget: overTarget, est: est, expired: !!expired }));
+    root.appendChild(exportSection(rows, { correct: correct, n: n, pct: pct, used: used, blanks: blanks, careless: careless, overTarget: overTarget, est: est, band: band, ptab: ptab, expired: !!expired }));
 
     const again = el("div");
     again.style.display = "flex";
@@ -660,6 +664,113 @@
     again.appendChild(back); again.appendChild(retry);
     root.appendChild(again);
     typeset(root);
+  }
+
+
+  /* ---------------- percentiles ---------------- */
+  // which GMAC table applies: set.percentileTable ("quant" | "verbal" | "di" | "none") wins, else infer from section name
+  function percentileTableFor(set) {
+    const P = window.GMAT_PERCENTILES;
+    if (!P || !set) return null;
+    const key = (set.percentileTable || "").toLowerCase();
+    if (key === "none") return null;
+    if (P[key]) return P[key];
+    const sec = String(set.section || "");
+    if (/quant/i.test(sec)) return P.quant;
+    if (/verbal/i.test(sec)) return P.verbal;
+    if (/data\s*insight|^\s*di\b/i.test(sec)) return P.di;
+    return null;
+  }
+  const pctAt = (t, score) => t.table[Math.max(60, Math.min(90, Math.round(score)))];
+  const fmtPct = (t, v) => (t.decimals ? v.toFixed(t.decimals) : String(Math.round(v))) + "%";
+  function ordinal(v) {
+    const n = Math.round(v);
+    if (n >= 100) return "99th+";
+    const s = n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th";
+    return n + s;
+  }
+  // share of test takers at each exact score, from the "percent below" table
+  function shareAt(t, s) {
+    const below = t.table[s], next = s < 90 ? t.table[s + 1] : 100;
+    let v = Math.max(0, next - below);
+    if (s === 60) v += below; // fold the floor into the lowest score
+    return v;
+  }
+
+  function percentileSection(t, band) {
+    const s = el("section", "block pct-block");
+    s.appendChild(el("h2", null, "Where your band sits among test takers"));
+    const pMid = pctAt(t, band.mid);
+    const lead = el("p", "why no-format");
+    lead.textContent = "On the " + t.label + " scale, " + (/^8/.test(String(band.mid)) ? "an " : "a ") + band.mid + " scores higher than about " + fmtPct(t, pMid) +
+      " of recent test takers. Your band of " + band.low + "–" + band.high + " spans roughly the " +
+      ordinal(pctAt(t, band.low)) + " to " + ordinal(pctAt(t, band.high)) + " percentile.";
+    s.appendChild(lead);
+
+    // histogram of the recent score distribution, band highlighted
+    const W = 640, H = 210, padL = 34, padR = 10, padT = 26, padB = 30;
+    const scores = []; for (let x = 60; x <= 90; x++) scores.push(x);
+    const shares = scores.map((x) => shareAt(t, x));
+    const maxShare = Math.max.apply(null, shares) * 1.12;
+    const bw = (W - padL - padR) / scores.length;
+    const y = (v) => padT + (H - padT - padB) * (1 - v / maxShare);
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.setAttribute("class", "pct-chart");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Distribution of " + t.label + " scores with your estimated band " + band.low + " to " + band.high + " highlighted");
+    const mk = (tag, attrs, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; svg.appendChild(e); return e; };
+    const x0 = padL + (band.low - 60) * bw, x1 = padL + (band.high - 60 + 1) * bw;
+    mk("rect", { x: x0, y: padT - 18, width: x1 - x0, height: H - padB - padT + 18, class: "pct-bandbg", rx: 4 });
+    mk("text", { x: (x0 + x1) / 2, y: padT - 6, "text-anchor": "middle", class: "pct-bandlbl" }, "your band");
+    [0, 0.5, 1].forEach(function (f) {
+      const v = maxShare / 1.12 * f, yy = y(v);
+      mk("line", { x1: padL, x2: W - padR, y1: yy, y2: yy, class: "pct-grid" });
+      mk("text", { x: padL - 6, y: yy + 3, "text-anchor": "end", class: "pct-axis" }, Math.round(v) + "%");
+    });
+    scores.forEach(function (sc, i) {
+      const v = shares[i], inBand = sc >= band.low && sc <= band.high;
+      const r = mk("rect", { x: padL + i * bw + 1.5, y: y(v), width: bw - 3, height: Math.max(0.5, H - padB - y(v)), rx: 2,
+        class: "pct-bar" + (inBand ? " in" : "") + (sc === band.mid ? " mid" : "") });
+      const tt = document.createElementNS(NS, "title");
+      tt.textContent = "Score " + sc + ": " + v.toFixed(t.decimals ? 1 : 0) + "% of test takers · percentile " + fmtPct(t, t.table[sc]);
+      r.appendChild(tt);
+      if (sc % 5 === 0) mk("text", { x: padL + i * bw + bw / 2, y: H - padB + 16, "text-anchor": "middle", class: "pct-axis" }, String(sc));
+    });
+    mk("text", { x: W - padR, y: H - 2, "text-anchor": "end", class: "pct-axis" }, "section score →");
+    const wrap = el("div", "pct-wrap"); wrap.appendChild(svg); s.appendChild(wrap);
+    // on narrow screens the chart scrolls sideways; start it centred on the band
+    requestAnimationFrame(function () {
+      if (wrap.scrollWidth <= wrap.clientWidth) return;
+      const scale = svg.getBoundingClientRect().width / W;
+      wrap.scrollLeft = ((x0 + x1) / 2) * scale - wrap.clientWidth / 2;
+    });
+
+    // readout
+    const tbl = el("table", "data pct-table");
+    const th = el("thead"), hr = el("tr");
+    ["", "Section score", "Percentile", "Ahead of"].forEach((h) => hr.appendChild(el("th", null, h)));
+    th.appendChild(hr); tbl.appendChild(th);
+    const tb = el("tbody");
+    [["Low end", band.low], ["Point estimate", band.mid], ["High end", band.high]].forEach(function (pair) {
+      const tr = el("tr"); if (pair[1] === band.mid) tr.className = "mid";
+      const p = pctAt(t, pair[1]);
+      tr.appendChild(el("td", null, pair[0]));
+      tr.appendChild(el("td", "mono", String(pair[1])));
+      tr.appendChild(el("td", "mono", ordinal(p)));
+      tr.appendChild(el("td", null, "about " + fmtPct(t, p) + " of test takers"));
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb); s.appendChild(tbl);
+
+    const note = el("p", "pct-note");
+    note.appendChild(document.createTextNode("Percentile = share of test takers who scored below that section score. Source: "));
+    const a = el("a", null, t.source); a.href = t.url; a.target = "_blank"; a.rel = "noopener";
+    note.appendChild(a);
+    note.appendChild(document.createTextNode(". The band itself comes from raw accuracy on a fixed, non-adaptive set, so treat the percentile as a direction check, not a prediction of your official score."));
+    s.appendChild(note);
+    return s;
   }
 
   function bandSection(rows) {
@@ -856,7 +967,16 @@
         questions: sum.n,
         correct: sum.correct,
         accuracyPercent: sum.pct,
-        estimatedBand: (sum.est - 2) + "-" + (sum.est + 2),
+        estimatedBand: sum.band.low + "-" + sum.band.high,
+        estimatedPercentile: sum.ptab ? {
+          section: sum.ptab.label,
+          low: { score: sum.band.low, percentile: pctAt(sum.ptab, sum.band.low) },
+          mid: { score: sum.band.mid, percentile: pctAt(sum.ptab, sum.band.mid) },
+          high: { score: sum.band.high, percentile: pctAt(sum.ptab, sum.band.high) },
+          source: sum.ptab.source,
+          sourceUrl: sum.ptab.url,
+          note: "Percentile = share of test takers scoring below. The band is a rough, non-adaptive estimate from accuracy only."
+        } : null,
         secondsUsed: Math.round(sum.used),
         secondsAvailable: S.total,
         avgSecondsPerQuestion: Math.round(sum.used / sum.n),

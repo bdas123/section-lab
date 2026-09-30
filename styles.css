@@ -362,3 +362,26 @@ pre.export {
   }
   .exam-card.split .stimulus .prose p { margin-bottom: 1em; }
 }
+
+/* ---------- percentile band ---------- */
+.pct-block > .why { max-width: 72ch; margin-bottom: var(--space-4); }
+.pct-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--space-4) var(--space-5) var(--space-3); }
+.pct-chart { width: 100%; height: auto; display: block; overflow: visible; }
+.pct-bar { fill: var(--ink-3); opacity: 0.28; transition: opacity 0.12s ease; }
+.pct-bar:hover { opacity: 0.55; }
+.pct-bar.in { fill: var(--accent); opacity: 0.75; }
+.pct-bar.mid { opacity: 1; }
+.pct-bandbg { fill: var(--accent); opacity: 0.08; }
+.pct-bandlbl { fill: var(--accent); font-size: 11px; font-weight: 500; letter-spacing: 0.04em; }
+.pct-grid { stroke: var(--border); stroke-width: 1; }
+.pct-axis { fill: var(--ink-3); font-size: 10.5px; font-family: var(--font-mono, "JetBrains Mono", monospace); }
+.pct-table { margin-top: var(--space-4); }
+.pct-table tr.mid td { font-weight: 700; color: var(--ink); }
+.pct-table td:first-child { color: var(--ink-2); }
+.pct-note { font-size: var(--text-xs); color: var(--ink-3); margin-top: var(--space-3); max-width: 80ch; }
+.pct-note a { color: var(--accent); }
+@media (max-width: 640px) {
+  .pct-wrap { overflow-x: auto; padding: var(--space-3); }
+  .pct-chart { min-width: 520px; }
+  .pct-table th:nth-child(4), .pct-table td:nth-child(4) { display: none; }
+}
