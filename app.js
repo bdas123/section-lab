@@ -973,6 +973,20 @@
       out.bands[key] = { low: lo, high: hi, mid: (lo + hi) / 2, se: Math.max(1, (hi - lo) / 2) };
     });
     if (!Object.keys(out.bands).length) throw new Error("scoreContext needs at least one of quant, verbal, di");
+    // optional: this week's average section scores, and a note on what they were computed from
+    out.average = {};
+    if (sc.average != null) {
+      if (typeof sc.average !== "object" || Array.isArray(sc.average)) throw new Error("scoreContext.average must be an object like {\"quant\": 80.5}");
+      Object.keys(sc.average).forEach(function (k) {
+        const v = sc.average[k], lk = k.toLowerCase().trim();
+        if (lk === "total") { if (typeof v !== "number" || v < 205 || v > 805) throw new Error("scoreContext.average.total must be 205 to 805"); out.average.total = v; return; }
+        const key = CTX_KEYS[lk];
+        if (!key) return;
+        if (typeof v !== "number" || v < 60 || v > 90) throw new Error("scoreContext.average." + k + " must be a number from 60 to 90");
+        out.average[key] = v;
+      });
+    }
+    out.basedOn = sc.basedOn != null ? String(sc.basedOn) : "";
     return out;
   }
   function ctxLabel(ctx) {
@@ -983,6 +997,7 @@
     if (ctx.date) parts.push(String(ctx.date));
     return parts.join(" \u00b7 ") || "Coming in";
   }
+  const avgTxt0 = (v) => String(Math.round(v * 10) / 10);
   const rangeTxt = (b) => (b.low === b.high ? String(b.low) : b.low + "\u2013" + b.high);
   const totalTxt = (t) => t.mid + " (" + t.low + "\u2013" + t.high + ")";
 
@@ -1023,6 +1038,15 @@
       lead.textContent = "Add " + im.missing.map((k) => P[k].label).join(" and ") + " to this set's scoreContext to project a total. The section change is below.";
     }
     s.appendChild(lead);
+    const vsAvg = im.rows.filter((r) => r.taken && ctx.average && ctx.average[r.key] != null).map(function (r) {
+      const d = Math.round((r.after.mid - ctx.average[r.key]) * 10) / 10;
+      return SHORT[r.key] + " " + r.after.mid + " vs a week average of " + avgTxt0(ctx.average[r.key]) + " (" + (d > 0 ? "+" : d < 0 ? "\u2212" : "\u00b1") + Math.abs(d) + ")";
+    });
+    if (vsAvg.length || ctx.basedOn) {
+      const p2 = el("p", "why no-format impact-avg");
+      p2.textContent = (vsAvg.length ? "Against this week: " + vsAvg.join("; ") + ". " : "") + (ctx.basedOn ? "Coming-in figures based on " + ctx.basedOn + "." : "");
+      s.appendChild(p2);
+    }
     if (im.before && im.after) {
       const hd = el("div", "impact-head");
       const box = (k, t, p) => { const c = el("div", "impact-box"); c.appendChild(el("div", "k", k)); c.appendChild(el("div", "v", t.low + "\u2013" + t.high)); c.appendChild(el("div", "sub", "point " + t.mid + " \u00b7 " + ordinal(p) + " percentile")); return c; };
@@ -1033,12 +1057,15 @@
       s.appendChild(hd);
     }
     const tbl = el("table", "data");
-    const hr = el("tr"); ["Section", "Coming in", "This session", "Change"].forEach((h) => hr.appendChild(el("th", null, h)));
+    const hasAvg = Object.keys(ctx.average || {}).length > 0;
+    const hr = el("tr"); ["Section"].concat(hasAvg ? ["Week average"] : [], ["Coming in", "This session", "Change"]).forEach((h) => hr.appendChild(el("th", null, h)));
     const th = el("thead"); th.appendChild(hr); tbl.appendChild(th);
     const tb = el("tbody");
+    const avgTxt = (v) => (v == null ? "\u2014" : String(Math.round(v * 10) / 10));
     im.rows.forEach(function (r) {
       const tr = el("tr"); if (r.taken) tr.className = "taken";
       tr.appendChild(el("td", null, P[r.key].label));
+      if (hasAvg) tr.appendChild(el("td", "mono", avgTxt(ctx.average[r.key])));
       tr.appendChild(el("td", "mono", r.before ? rangeTxt(r.before) : "\u2014"));
       tr.appendChild(el("td", "mono", r.taken ? rangeTxt(r.after) : "held"));
       const d = r.taken && r.before ? Math.round((r.after.mid - r.before.mid) * 10) / 10 : null;
@@ -1048,6 +1075,7 @@
     if (im.before || im.after) {
       const tr = el("tr", "total-row");
       tr.appendChild(el("td", null, "Projected total"));
+      if (hasAvg) tr.appendChild(el("td", "mono", ctx.average.total != null ? String(Math.round(ctx.average.total)) : "\u2014"));
       tr.appendChild(el("td", "mono", im.before ? totalTxt(im.before) : "\u2014"));
       tr.appendChild(el("td", "mono", im.after ? totalTxt(im.after) : "\u2014"));
       tr.appendChild(el("td", "mono " + (im.delta > 0 ? "pos" : im.delta < 0 ? "neg" : ""), im.delta == null ? "\u2014" : (im.delta > 0 ? "+" : im.delta < 0 ? "\u2212" : "\u00b1") + Math.abs(im.delta)));
@@ -1064,7 +1092,7 @@
     const im = computeImpact(ctx, fresh);
     const tot = (t, p) => (t ? { low: t.low, mid: t.mid, high: t.high, percentile: p } : null);
     return {
-      context: { week: ctx.week, day: ctx.day, date: ctx.date, label: ctxLabel(ctx), ranges: ctx.bands },
+      context: { week: ctx.week, day: ctx.day, date: ctx.date, label: ctxLabel(ctx), ranges: ctx.bands, weekAverage: ctx.average, basedOn: ctx.basedOn || null },
       sections: im.rows.map((r) => ({ section: r.key, comingIn: r.before ? [r.before.low, r.before.high] : null, thisSession: r.taken ? [r.after.low, r.after.high] : null })),
       projectedTotalBefore: tot(im.before, im.pct.before),
       projectedTotalAfter: tot(im.after, im.pct.after),

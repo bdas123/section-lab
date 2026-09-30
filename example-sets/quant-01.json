@@ -7,6 +7,13 @@
     "week": 3,
     "day": 2,
     "date": "2026-09-30",
+    "basedOn": "4 Section Lab sessions, Sep 28–30 (week 3)",
+    "average": {
+      "quant": 80.5,
+      "verbal": 81.0,
+      "di": 82.3,
+      "total": 625
+    },
     "quant": [
       78,
       82

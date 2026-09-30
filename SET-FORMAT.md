@@ -28,6 +28,8 @@ Add `scoreContext` to a set to record your current score range for all three sec
   "week": 3,
   "day": 2,
   "date": "2026-09-30",
+  "basedOn": "4 Section Lab sessions, Sep 28–30",
+  "average": { "quant": 80.5, "verbal": 81.0, "di": 82.3, "total": 625 },
   "quant": [78, 82],
   "verbal": [79, 83],
   "di": [80, 84]
@@ -37,6 +39,8 @@ Add `scoreContext` to a set to record your current score range for all three sec
 - Each range is `[low, high]`, `{"low": 78, "high": 82}`, or a single score, all whole numbers from 60 to 90. The width of the range is treated as its uncertainty.
 - Include the section you're about to take as well, so the report can show that section's own change.
 - `week`, `day`, `date`, and an optional `label` (e.g. `"Week 3 · Day 2"`) are shown on the set card and in the report.
+- `average` (optional) holds this week's average section scores (60–90, decimals allowed) and `total` (205–805). The report adds a Week average column and compares this session's estimate with it.
+- `basedOn` (optional) is a one-line note on where the numbers came from, shown in the report.
 - If a section is missing, the report still shows the section change but can't project the "coming in" total.
 - The exported JSON carries the result under `summary.overallImpact` (or top-level `overallImpact` for a full exam).
 
