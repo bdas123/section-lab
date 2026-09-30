@@ -294,11 +294,13 @@
   function addSetsFromText(text, label) {
     const parsed = JSON.parse(text);
     const list = Array.isArray(parsed) ? parsed : [parsed];
+    let n = 0;
     list.forEach(function (s) {
-      try { window.registerSet(s); }
+      if (isLog(s)) { importLog(s); return; }
+      try { window.registerSet(s); n++; }
       catch (e) { throw new Error((label ? label + " — " : "") + e.message); }
     });
-    return list.length;
+    return n;
   }
 
   function loadMsg(text, bad) {
@@ -601,6 +603,88 @@
     return { tag: "Content gap", cls: "bad", note: "Wrong at roughly normal pace — the concept, not the clock." };
   }
 
+  /* ---------------- difficulty-calibrated section score ----------------
+     A one-parameter (Rasch-style) model on the 60–90 section scale. Each difficulty label gets a level b:
+     the section score at which a test taker has a 50% chance of getting that question right. Your score is
+     the ability θ that best explains your right/wrong pattern, P(correct) = 1 / (1 + e^−(θ − b)/4), with a
+     weak prior centred on 75 so tiny or perfect sets don't run off the scale. The same accuracy on harder
+     questions therefore scores higher, and the band width comes from how much the answers pin θ down. */
+  const DIFF_LEVELS = [
+    [/very\s*hard|expert|elite|8\d\d|\b8\d\b/i, 86, "Very hard"],
+    [/hard|difficult|7\d\d|\b7\d\b/i, 82, "Hard"],
+    [/med|moderate|6\d\d|\b6\d\b/i, 75, "Medium"],
+    [/easy|basic|[1-5]\d\d/i, 67, "Easy"]
+  ];
+  const CAL = { slope: 4, priorMean: 75, priorSd: 10, fallback: 75 };
+  function levelOf(q, set) {
+    if (typeof q.level === "number" && isFinite(q.level)) return Math.max(55, Math.min(95, q.level));
+    const m = set && set.difficultyLevels;
+    if (m && typeof m[q.diff] === "number") return m[q.diff];
+    const hit = DIFF_LEVELS.find((d) => d[0].test(String(q.diff || "")));
+    return hit ? hit[1] : CAL.fallback;
+  }
+  const logistic = (x) => 1 / (1 + Math.exp(-x));
+  function calibrate(rows, set) {
+    const items = rows.map((r) => ({ b: levelOf(r.q, set), y: r.correct ? 1 : 0 }));
+    const s = CAL.slope, pv = CAL.priorSd * CAL.priorSd;
+    let th = CAL.priorMean, h = -1 / pv;
+    for (let k = 0; k < 100; k++) {
+      let g = -(th - CAL.priorMean) / pv; h = -1 / pv;
+      items.forEach(function (it) { const p = logistic((th - it.b) / s); g += (it.y - p) / s; h -= (p * (1 - p)) / (s * s); });
+      const step = Math.max(-4, Math.min(4, g / h)); // damped Newton step on a concave log-posterior
+      th -= step;
+      if (Math.abs(step) < 1e-6) break;
+    }
+    const se = 1 / Math.sqrt(-h);
+    const mid = Math.max(60, Math.min(90, Math.round(th)));
+    const half = Math.max(1, Math.min(6, Math.round(se)));
+    const expected = (b) => logistic((th - b) / s);
+    return { theta: th, se: se, mid: mid, half: half, expected: expected, items: items };
+  }
+
+  // report block: how the difficulty mix moved the estimate, and where you beat or trailed expectation
+  function calibrationSection(rows, sm) {
+    const s = el("section", "block cal-block");
+    s.appendChild(el("h2", null, "Difficulty calibration"));
+    const groups = new Map();
+    rows.forEach(function (r) {
+      const b = levelOf(r.q, S.set), k = String(r.q.diff || "Untagged");
+      if (!groups.has(k)) groups.set(k, { k: k, b: b, n: 0, c: 0 });
+      const g = groups.get(k); g.n++; if (r.correct) g.c++;
+    });
+    const list = Array.from(groups.values()).sort((a, b) => a.b - b.b);
+    const diffPts = sm.est - sm.rawEst;
+    const lead = el("p", "why no-format");
+    lead.textContent = "Your mix: " + list.map((g) => g.n + " " + g.k).join(" \u00b7 ") + ". Weighting each answer by question difficulty gives " +
+      sm.est + " (" + sm.band.low + "\u2013" + sm.band.high + "), versus " + sm.rawEst + " from accuracy alone" +
+      (diffPts === 0 ? " \u2014 this mix is close to average difficulty, so the two agree." :
+        diffPts > 0 ? ": the set ran harder than average, so the same accuracy earns " + diffPts + " more point" + (diffPts === 1 ? "" : "s") + "." :
+          ": the set ran easier than average, so the same accuracy earns " + (-diffPts) + " fewer point" + (diffPts === -1 ? "" : "s") + ".");
+    s.appendChild(lead);
+    const tbl = el("table", "data");
+    const hr = el("tr"); ["Difficulty", "Level", "Correct", "Accuracy", "Expected at " + sm.est, "vs expected"].forEach((h) => hr.appendChild(el("th", null, h)));
+    const th = el("thead"); th.appendChild(hr); tbl.appendChild(th);
+    const tb = el("tbody");
+    list.forEach(function (g) {
+      const tr = el("tr"), acc = g.c / g.n, exp = sm.cal.expected(g.b), d = Math.round((acc - exp) * 100);
+      tr.appendChild(el("td", null, g.k));
+      tr.appendChild(el("td", "mono", String(g.b)));
+      tr.appendChild(el("td", "mono", g.c + "/" + g.n));
+      tr.appendChild(el("td", "mono", Math.round(acc * 100) + "%"));
+      tr.appendChild(el("td", "mono", Math.round(exp * 100) + "%"));
+      tr.appendChild(el("td", "mono " + (d >= 10 ? "pos" : d <= -10 ? "neg" : ""), (d > 0 ? "+" : "") + d + " pts"));
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);
+    const tw = el("div", "table-scroll"); tw.appendChild(tbl); s.appendChild(tw);
+    const note = el("p", "pct-note");
+    note.textContent = "Level = the section score at which a test taker gets that difficulty right half the time (Easy 67, Medium 75, Hard 82, Very hard 86; override per set with difficultyLevels or per question with level). " +
+      "The estimate is the score that best explains your right/wrong pattern across those levels; the band is about \u00b11 standard error (\u00b1" + sm.cal.se.toFixed(1) + " here), so short sets get wider bands. " +
+      "For a given set, what matters is how many you got right weighed against how hard the whole set was, so a Hard hit offsets a Medium miss. The calibration is only as good as the difficulty tags.";
+    s.appendChild(note);
+    return s;
+  }
+
   // every number the report needs, computed from the current S state
   function summarize() {
     const rows = S.order.map(function (qi, idx) {
@@ -611,7 +695,9 @@
     });
     const n = rows.length;
     const correct = rows.filter((r) => r.correct).length;
-    const est = 60 + Math.round((correct / n) * 30);
+    const rawEst = 60 + Math.round((correct / n) * 30);
+    const cal = calibrate(rows, S.set);
+    const est = cal.mid;
     const ptab = percentileTableFor(S.set);
     return {
       rows: rows, n: n, correct: correct, pct: Math.round((correct / n) * 100),
@@ -619,8 +705,8 @@
       blanks: rows.filter((r) => !r.answered).length,
       careless: rows.filter((r) => r.diag.tag === "Careless").length,
       overTarget: rows.filter((r) => r.time > r.q.target * 1.15).length,
-      est: est,
-      band: { low: Math.max(60, est - 2), mid: est, high: Math.min(90, est + 2) },
+      est: est, rawEst: rawEst, cal: cal,
+      band: { low: Math.max(60, est - cal.half), mid: est, high: Math.min(90, est + cal.half), se: cal.se },
       ptab: ptab, key: ptab ? ptab.key : null
     };
   }
@@ -660,7 +746,7 @@
       kpis.appendChild(c);
     };
     addKpi("Estimated band", band.low + "–" + band.high,
-      ptab ? pctRange(ptab, band.low, band.high) : "Rough, non-adaptive estimate");
+      ptab ? pctRange(ptab, band.low, band.high) : "Difficulty-weighted, non-adaptive");
     addKpi("Time used", fmt(used), "of " + fmt(S.total));
     addKpi("Avg per question", fmt(used / n), "target " + fmt(S.total / n));
     addKpi("Over target", overTarget + " / " + n, "spent >15% over pace");
@@ -669,13 +755,14 @@
     root.appendChild(kpis);
 
     if (ptab) root.appendChild(percentileSection(ptab, band));
+    root.appendChild(calibrationSection(rows, sm));
     if (!opts.onBack && ptab) { const pj = latestProjectionSection(); if (pj) root.appendChild(pj); }
     root.appendChild(bandSection(rows));
     root.appendChild(paceSection(rows));
     root.appendChild(groupSection("Accuracy by topic", rows, (r) => r.q.topic));
     root.appendChild(groupSection("Accuracy by difficulty", rows, (r) => r.q.diff));
     root.appendChild(reviewSection(rows));
-    root.appendChild(exportSection(rows, { correct: correct, n: n, pct: pct, used: used, blanks: blanks, careless: careless, overTarget: overTarget, est: est, band: band, ptab: ptab, expired: !!expired }));
+    root.appendChild(exportSection(rows, { correct: correct, n: n, pct: pct, used: used, blanks: blanks, careless: careless, overTarget: overTarget, est: est, rawEst: sm.rawEst, cal: sm.cal, band: band, ptab: ptab, expired: !!expired }));
 
     const again = el("div");
     again.style.display = "flex";
@@ -847,34 +934,58 @@
   function totalFromSections(sum) {
     return Math.max(205, Math.min(805, 205 + 10 * Math.round(((sum - 180) * 2) / 3)));
   }
-  // each section estimate is ±2; three independent errors combine to about ±3.5 section points ≈ ±20 total points
-  const TOTAL_HALF_WIDTH = 20;
+  // section standard errors add in quadrature, then convert to total points (× 20/3), rounded to a 10-point step
   function projectTotal(bands) {
     const sum = bands.reduce((a, b) => a + b.mid, 0);
     const mid = totalFromSections(sum);
-    return { low: Math.max(205, mid - TOTAL_HALF_WIDTH), mid: mid, high: Math.min(805, mid + TOTAL_HALF_WIDTH), sum: sum };
+    const seSum = Math.sqrt(bands.reduce((a, b) => a + Math.pow(b.se != null ? b.se : 2, 2), 0));
+    const half = Math.max(10, 10 * Math.round((seSum * 20) / 3 / 10));
+    return { low: Math.max(205, mid - half), mid: mid, high: Math.min(805, mid + half), sum: sum, half: half, seSum: seSum };
   }
 
-  /* ---------------- section history (this browser only) ---------------- */
-  const HKEY = "sectionlab.history.v1";
-  function readHistory() {
-    try { const h = JSON.parse(localStorage.getItem(HKEY) || "[]"); return Array.isArray(h) ? h : []; }
-    catch (e) { return []; }
-  }
+  /* ---------------- section history (this tab, plus any error logs you load back in) ---------------- */
+  const HISTORY = [];
+  function readHistory() { return HISTORY; }
   function recordHistory(sm, ctx) {
     if (!sm.key) return;
-    const h = readHistory();
-    h.push({
+    HISTORY.push({
       at: new Date().toISOString(), date: localDate(), key: sm.key,
       section: ctx.set.section, set: ctx.set.title, setId: ctx.set.id,
-      correct: sm.correct, questions: sm.n, low: sm.band.low, mid: sm.band.mid, high: sm.band.high,
+      correct: sm.correct, questions: sm.n, low: sm.band.low, mid: sm.band.mid, high: sm.band.high, se: sm.band.se,
       practice: !!(ctx.reveal || ctx.pausable), fullExam: !!EXAM
     });
-    try { localStorage.setItem(HKEY, JSON.stringify(h.slice(-200))); } catch (e) { /* storage full or blocked */ }
+  }
+  // an exported section log (or a full-exam log) dropped into the loader restores its results for projection
+  const isLog = (o) => o && typeof o === "object" && (o.type === "full-exam" || (o.summary && o.summary.estimatedBand != null && !o.questions));
+  let importedLogs = 0;
+  function importLog(o) {
+    if (o.type === "full-exam") return (o.sections || []).reduce((a, x) => a + importLog(x), 0);
+    const t = percentileTableFor({ section: o.section });
+    if (!t) return 0;
+    const sm = o.summary, ep = sm.estimatedPercentile;
+    const parts = String(sm.estimatedBand).split("-").map(Number);
+    const mid = ep && ep.mid ? ep.mid.score : Math.round((parts[0] + parts[1]) / 2);
+    if (!isFinite(mid)) return 0;
+    const at = o.exportedAt || (o.date ? o.date + "T12:00:00Z" : new Date(0).toISOString());
+    if (HISTORY.some((e) => e.at === at && e.key === t.key)) return 0; // already loaded
+    HISTORY.push({
+      at: at, date: o.date || at.slice(0, 10), key: t.key, section: o.section, set: o.set || "Imported log", setId: o.setId,
+      correct: sm.correct, questions: sm.questions, low: parts[0], mid: mid, high: parts[1],
+      se: sm.calibration && sm.calibration.standardError != null ? sm.calibration.standardError : 2,
+      practice: false, imported: true
+    });
+    importedLogs++;
+    return 1;
+  }
+  function describeLoad(n) {
+    const logs = importedLogs; importedLogs = 0;
+    const setsMsg = n === 0 ? "" : n === 1 ? "Set added and selected." : n + " sets added.";
+    const logMsg = logs ? logs + " past section result" + (logs === 1 ? "" : "s") + " loaded for the projected total." : "";
+    return [setsMsg, logMsg].filter(Boolean).join(" ") || "Nothing new to add.";
   }
   function latestBySection() {
-    const h = readHistory(), out = {};
-    h.forEach((e) => { if (SECTION_KEYS.indexOf(e.key) > -1) out[e.key] = e; });
+    const out = {};
+    readHistory().forEach((e) => { if (SECTION_KEYS.indexOf(e.key) > -1 && (!out[e.key] || e.at >= out[e.key].at)) out[e.key] = e; });
     return out;
   }
 
@@ -888,7 +999,7 @@
     if (missing.length) {
       const p = el("p", "why no-format");
       p.textContent = "A projected total needs a recent result in all three sections. Still missing: " +
-        missing.map((k) => P[k].label).join(", ") + ". Take those sections here, or run a full three-section exam from the setup screen.";
+        missing.map((k) => P[k].label).join(", ") + ". Take those sections here, drop their exported error-log JSON files into the loader, or run a full three-section exam from the setup screen.";
       s.appendChild(p);
       return s;
     }
@@ -907,19 +1018,19 @@
     SECTION_KEYS.forEach(function (k) {
       const e = last[k], tr = el("tr");
       tr.appendChild(el("td", null, P[k].label));
-      tr.appendChild(el("td", null, e.set + (e.practice ? " (practice mode)" : "")));
+      tr.appendChild(el("td", null, e.set + (e.practice ? " (practice mode)" : e.imported ? " (from log)" : "")));
       tr.appendChild(el("td", "mono", e.date));
       tr.appendChild(el("td", "mono", e.mid + " (" + e.low + "–" + e.high + ")"));
       tb.appendChild(tr);
     });
     tbl.appendChild(tb); s.appendChild(tbl);
     const note = el("p", "pct-note");
-    note.textContent = "Combines your most recent result in each section, which may come from different days and sets. A full three-section exam gives a cleaner projection. Results are saved only in this browser. ";
-    const clr = el("button", "linklike", "Clear saved results");
+    note.textContent = "Combines your most recent result in each section, which may come from different days and sets. A full three-section exam gives a cleaner projection. Results last for this tab; to bring past ones back, drop their exported error-log JSON files into the loader. ";
+    const clr = el("button", "linklike", "Clear results");
     clr.type = "button";
     clr.addEventListener("click", function () {
-      if (!confirm("Clear every saved section result in this browser?")) return;
-      try { localStorage.removeItem(HKEY); } catch (e) { /* ignore */ }
+      if (!confirm("Clear every section result held in this tab?")) return;
+      HISTORY.length = 0;
       s.replaceWith(latestProjectionSection() || el("div"));
     });
     note.appendChild(clr);
@@ -1021,7 +1132,7 @@
     const quit = el("button", "linklike quit-exam", "Quit the full exam");
     quit.type = "button";
     quit.addEventListener("click", function () {
-      if (!confirm("Quit the full exam? Completed sections stay in your saved results, but no total is projected.")) return;
+      if (!confirm("Quit the full exam? Completed sections still count toward the projected total on later reports.")) return;
       if (breakTick) { clearInterval(breakTick); breakTick = null; }
       EXAM = null;
       box.classList.add("hidden");
@@ -1113,9 +1224,10 @@
     ms.appendChild(el("h2", null, "How the projection works"));
     const ul = el("ul", "method no-format");
     [
-      "Each section estimate is 60 + accuracy \u00d7 30, with a \u00b12 band. It's non-adaptive: the real exam weighs question difficulty, which a fixed set can't.",
+      "Each section estimate is difficulty-weighted: every answer is scored against its difficulty level (Easy 67, Medium 75, Hard 82, Very hard 86), so the same accuracy on a harder set scores higher. See each section's Difficulty calibration table.",
       "The three point estimates are combined on GMAC's total scale: (Quant + Verbal + DI \u2212 180) \u00d7 20/3 + 205, rounded to the nearest total ending in 5. Sections count equally.",
-      "The \u00b12 errors in each section partly cancel, so the total range is the point estimate \u00b120 rather than the full \u00b140.",
+      "Section uncertainties combine in quadrature (they partly cancel), then convert to total points: here \u00b1" + pj.half + " around the point estimate. Longer sets narrow it.",
+      "It's still non-adaptive: the real exam picks each question from your running performance, which a fixed set can't.",
       "Percentiles come from GMAC's August 2026 tables (exams July 2021 \u2013 June 2026): the share of test takers who scored below that score."
     ].forEach((t) => ul.appendChild(el("li", null, t)));
     ms.appendChild(ul);
@@ -1130,12 +1242,13 @@
       projectedTotal: {
         low: pj.low, mid: pj.mid, high: pj.high,
         percentile: { low: pctAt(T, pj.low), mid: pctAt(T, pj.mid), high: pctAt(T, pj.high) },
-        sectionSum: pj.sum, method: "(Q+V+DI-180)*20/3+205, rounded to a total ending in 5; range = point estimate ±20",
+        sectionSum: pj.sum, method: "(Q+V+DI-180)*20/3+205, rounded to a total ending in 5; range = point estimate ± sqrt(sum of section SE^2) * 20/3, rounded to 10",
+        halfWidth: pj.half,
         source: T.source, sourceUrl: T.url
       },
       sections: secs.map(function (x) {
         restore(x.snap);
-        return buildLogObject(x.sm.rows, { n: x.sm.n, correct: x.sm.correct, pct: x.sm.pct, used: x.sm.used, blanks: x.sm.blanks, careless: x.sm.careless, overTarget: x.sm.overTarget, est: x.sm.est, band: x.sm.band, ptab: x.sm.ptab, expired: x.snap.expired });
+        return buildLogObject(x.sm.rows, { n: x.sm.n, correct: x.sm.correct, pct: x.sm.pct, used: x.sm.used, blanks: x.sm.blanks, careless: x.sm.careless, overTarget: x.sm.overTarget, est: x.sm.est, rawEst: x.sm.rawEst, cal: x.sm.cal, band: x.sm.band, ptab: x.sm.ptab, expired: x.snap.expired });
       })
     };
     const jsonText = JSON.stringify(log, null, 2);
@@ -1381,7 +1494,22 @@
           high: { score: sum.band.high, percentile: pctAt(sum.ptab, sum.band.high) },
           source: sum.ptab.source,
           sourceUrl: sum.ptab.url,
-          note: "Percentile = share of test takers scoring below. The band is a rough, non-adaptive estimate from accuracy only."
+          note: "Percentile = share of test takers scoring below. The band is a difficulty-weighted but non-adaptive estimate."
+        } : null,
+        calibration: sum.cal ? {
+          method: "Rasch-style: P(correct) = 1/(1+exp(-(theta-level)/4)), prior N(75, 10^2); band = estimate ± round(SE)",
+          abilityEstimate: Math.round(sum.cal.theta * 10) / 10,
+          standardError: Math.round(sum.cal.se * 100) / 100,
+          accuracyOnlyEstimate: sum.rawEst,
+          byDifficulty: Array.from(rows.reduce(function (m, r) {
+            const k = String(r.q.diff || "Untagged");
+            if (!m.has(k)) m.set(k, { difficulty: k, level: levelOf(r.q, S.set), questions: 0, correct: 0 });
+            const g = m.get(k); g.questions++; if (r.correct) g.correct++;
+            return m;
+          }, new Map()).values()).map(function (g) {
+            g.expectedAccuracy = Math.round(sum.cal.expected(g.level) * 1000) / 10;
+            return g;
+          })
         } : null,
         secondsUsed: Math.round(sum.used),
         secondsAvailable: S.total,
@@ -1565,7 +1693,7 @@
       if (!raw) { loadMsg("Paste a set first.", true); return; }
       try {
         const n = addSetsFromText(raw);
-        loadMsg(n === 1 ? "Set added and selected." : n + " sets added.", false);
+        loadMsg(describeLoad(n), false);
         $("setJson").value = "";
       } catch (e) {
         loadMsg("Could not load that: " + e.message, true);
@@ -1628,7 +1756,7 @@
       });
       function report() {
         if (problems.length) loadMsg(problems.join(" · "), true);
-        else loadMsg(added === 1 ? "Set added and selected." : added + " sets added.", false);
+        else loadMsg(describeLoad(added), false);
       }
     }
     document.addEventListener("keydown", function (e) {

@@ -104,15 +104,15 @@ Each question is classified from correctness and time against its target:
 | Content gap + sink | Wrong and over 150% of target |
 | Unanswered | No answer recorded |
 
-The score band in the report is a rough, non-adaptive approximation from raw accuracy. It is useful for tracking your own trend, not for predicting an official score.
+The score band is **difficulty-calibrated**. Each difficulty tag gets a level on the 60–90 scale: the section score at which a test taker gets that kind of question right half the time (Easy 67, Medium 75, Hard 82, Very hard 86). The estimate is the score that best explains your right/wrong pattern under a one-parameter logistic (Rasch-style) model, `P(correct) = 1 / (1 + e^−(score − level)/4)`, with a weak prior at 75. So 60% on an all-Hard set scores about 84, while 60% on an all-Medium set scores about 77. The band is the estimate ± one standard error, so short sets get wider bands. The report's **Difficulty calibration** table shows the accuracy-only estimate next to the calibrated one, plus your accuracy against what's expected at your score for each difficulty. It's still non-adaptive, so use it to track your trend, not to predict an official score.
 
 The report places that band on the recent test-taker distribution for the section: a histogram of section scores with your band highlighted, and the percentile at the low, point, and high ends. Quant and Verbal use GMAC's August 2026 concordance tables (exams July 2021 – June 2026, to the tenth of a percent); Data Insights uses the same August 2026 update in whole percents. The numbers live in `percentiles.js` — GMAC refreshes them every Q3, so update that file when new tables come out.
 
 ### Full exam and projected total
 
-The setup screen has a **Full exam** panel: pick one Quant, one Verbal, and one Data Insights set and the section order, then run them back to back. You get one optional 10-minute break between sections, and results stay hidden until the end. The final report shows a **projected total score range** (point estimate ±20) with its percentile on GMAC's August 2026 total-score table, a 205–805 distribution chart, each section's band and percentile, a link to each section's full report, and one combined JSON log.
+The setup screen has a **Full exam** panel: pick one Quant, one Verbal, and one Data Insights set and the section order, then run them back to back. You get one optional 10-minute break between sections, and results stay hidden until the end. The final report shows a **projected total score range** (point estimate ± the combined section uncertainty, about ±20 for full-length sections) with its percentile on GMAC's August 2026 total-score table, a 205–805 distribution chart, each section's band and percentile, a link to each section's full report, and one combined JSON log.
 
-The total uses GMAC's equal section weighting: `(Q + V + DI − 180) × 20/3 + 205`, rounded to a total ending in 5 (80/80/82 → 615). After any single section, the report also projects a total from your latest saved result in each section, if all three exist. Those results are kept in this browser's local storage and can be cleared from the report. The **Mini full exam** sample loads three short sets to try the flow.
+The total uses GMAC's equal section weighting: `(Q + V + DI − 180) × 20/3 + 205`, rounded to a total ending in 5 (80/80/82 → 615). After any single section, the report also projects a total from your latest saved result in each section, if all three exist. Those results last for the tab; to bring earlier ones back, drop their exported error-log JSON files into the loader. The **Mini full exam** sample loads three short sets to try the flow.
 
 ## Project layout
 
@@ -127,7 +127,7 @@ vendor/katex/     bundled KaTeX (MIT) for offline math rendering
 
 ## Privacy
 
-Sets you load stay in the browser tab. Nothing is uploaded, and there is no analytics or network call of any kind after the page loads. The only thing saved is a short list of section scores (set title, date, estimate) in this browser's local storage, used for the projected total; clear it from any report. Download the error log before you leave — everything else is discarded when the tab closes.
+Sets you load stay in the browser tab. Nothing is uploaded, and there is no analytics or network call of any kind after the page loads. Closing the tab discards everything, so download the error log before you leave. Dropping an exported log back into the loader restores its scores for the projected total.
 
 ## License
 

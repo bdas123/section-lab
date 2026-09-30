@@ -17,6 +17,8 @@ No sets ship with the app. Any section works â€” Quant, Verbal, Data Insights â€
 
 `section` also picks the percentile table the report uses: a name containing "Quant", "Verbal", or "Data Insights" maps to that section's official distribution. To override, add `"percentileTable": "quant"`, `"verbal"`, `"di"`, or `"none"` (hides the percentile panel, e.g. for mixed drills).
 
+Difficulty drives the score calibration. `diff` labels containing Easy, Medium, Hard, or Very hard (or 500/600/700/800-level) map to levels 67, 75, 82, and 86 on the section scale. To use your own labels or levels, add a set-level map such as `"difficultyLevels": {"Foundation": 66, "Core": 74, "Stretch": 83}`, or give a single question a numeric `"level": 80`. Unrecognised labels count as 75.
+
 ## Question fields
 
 | Field | Required | Notes |

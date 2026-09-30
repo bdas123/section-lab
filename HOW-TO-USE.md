@@ -66,7 +66,8 @@ Work it like the real thing: do not look anything up, and do not pause on a time
 
 The report is built to answer one question — where did the points actually go?
 
-- **Headline** — raw correct count and percentage, plus a rough score band. The band is a non-adaptive approximation, so use it to track your own trend, not to predict an official score.
+- **Headline** — raw correct count and percentage, plus a difficulty-calibrated score band: the same accuracy on harder questions scores higher. It's non-adaptive, so use it to track your own trend, not to predict an official score.
+- **Difficulty calibration** — your mix of Easy / Medium / Hard, the calibrated estimate next to the accuracy-only one, and for each difficulty your accuracy against what's expected at your score. Big negative gaps on Medium questions are usually the cheapest points to win back.
 - **Where your band sits among test takers** — the band placed on GMAC's latest section-score distribution (August 2026), with the percentile at each end. Hover a bar to see the share of test takers at that score. The JSON export includes these percentiles under `summary.estimatedPercentile`.
 - **Six cards** — time used, average per question versus target, questions over target, careless misses, and unanswered.
 - **What actually cost you points** — every miss and slow solve grouped by cause, so you can see at a glance whether the section was a knowledge problem or a clock problem.
@@ -92,9 +93,9 @@ The distinction matters because the fixes are opposite. Careless misses need a p
 
 To simulate test day, use the **Full exam** panel on the setup screen. Choose a Quant, Verbal, and Data Insights set and a section order, then press **Start full exam**. Between sections you can take one 10-minute break (it auto-starts the next section when it runs out) or go straight on. Section results stay hidden until the end.
 
-The final report leads with a **projected total range** — the point estimate ±20 on the 205–805 scale — and its percentile from GMAC's August 2026 total-score table, plus each section's band and percentile. Use **View report** on any row for that section's full pacing and error analysis, and **Download JSON** for one file with everything.
+The final report leads with a **projected total range** — the point estimate ± the combined section uncertainty (about ±20 for full-length sections) on the 205–805 scale — and its percentile from GMAC's August 2026 total-score table, plus each section's band and percentile. Use **View report** on any row for that section's full pacing and error analysis, and **Download JSON** for one file with everything.
 
-A single section's report also shows a projected total built from your most recent saved result in each section. It mixes days and sets, so treat it as a rough check between full exams.
+A single section's report also shows a projected total built from your most recent saved result in each section. It mixes days and sets, so treat it as a rough check between full exams. Results last for the tab; drop exported error-log JSON files into the loader to bring earlier ones back.
 
 ## 6. Export your error log
 

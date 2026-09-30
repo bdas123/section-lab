@@ -417,3 +417,6 @@ ul.method li { margin: var(--space-2) 0; }
 .proj-head { display: flex; align-items: baseline; gap: var(--space-4); flex-wrap: wrap; margin: var(--space-2) 0 var(--space-2); }
 .proj-range { font-size: var(--text-xl); font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
 .proj-sub { color: var(--ink-2); font-size: var(--text-sm); }
+.cal-block > .why { max-width: 76ch; }
+.cal-block td.pos { color: var(--ok); font-weight: 600; }
+.cal-block td.neg { color: var(--bad); font-weight: 600; }
