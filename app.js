@@ -697,7 +697,7 @@
       const q = S.set.questions[qi];
       const a = S.answers[qi];
       const time = S.times[qi] || 0;
-      return { pos: idx + 1, q: q, a: a, time: time, correct: isCorrect(q, a), answered: hasAnswer(q, a), diag: classify(q, a, time) };
+      return { pos: idx + 1, qi: qi, q: q, a: a, time: time, correct: isCorrect(q, a), answered: hasAnswer(q, a), diag: classify(q, a, time) };
     });
     const n = rows.length;
     const correct = rows.filter((r) => r.correct).length;
@@ -1689,6 +1689,22 @@
       }, new Map()).values()).map(function (g) {
         return { topic: g.topic, attempted: g.attempted, correct: g.correct, avgSeconds: Math.round(g.totalSeconds / g.attempted) };
       }).sort((a, b) => a.correct / a.attempted - b.correct / b.attempted),
+      questionLog: rows.map(function (r) {
+        return {
+          question: r.pos,
+          questionId: r.q.id,
+          topic: r.q.topic,
+          difficulty: r.q.diff,
+          type: r.q.type,
+          seconds: Math.round(r.time * 10) / 10,
+          targetSeconds: r.q.target,
+          secondsOverTarget: r.q.target ? Math.round(r.time - r.q.target) : null,
+          answered: r.answered,
+          wasCorrect: r.correct,
+          flagged: !!S.flags[r.qi],
+          errorType: r.diag.tag
+        };
+      }),
       errorLog: flagged.map(function (r) {
         return {
           question: r.pos,
@@ -1713,7 +1729,7 @@
   function exportSection(rows, sum) {
     const s = el("section", "block");
     s.appendChild(el("h2", null, "Error log export"));
-    s.appendChild(el("p", "why", "Download the JSON file to hand back for error-log updates, or copy the tab-separated version straight into the workbook. Both cover every missed or off-pace question."));
+    s.appendChild(el("p", "why", "Download the JSON file to hand back for error-log updates, or copy the tab-separated version straight into the workbook. The JSON includes questionLog, with seconds for every question in the set, plus errorLog, which covers every missed or off-pace question in detail. The tab-separated version covers errorLog rows only."));
     const lines = ["Date\tSection\tSet\tQ#\tTopic\tDifficulty\tYour answer\tCorrect\tTime\tTarget\tError type\tTakeaway"];
     const today = localDate();
     rows.filter((r) => !r.correct || r.time > r.q.target * 1.15).forEach(function (r) {

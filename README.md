@@ -32,7 +32,7 @@ The review table diagnoses every question, and the pacing curve shows cumulative
 - **Reading comprehension.** Multi-paragraph passages defined once and shared across questions, shown beside the question on wide screens.
 - **Flags, palette, keyboard shortcuts.** `A`–`E` to answer, arrows to move, `F` to flag.
 - **Post-section report.** Accuracy, rough score band with its percentile against GMAC's latest distribution (Aug 2026 tables), pacing curve against an even-pace benchmark, accuracy by topic and difficulty, a per-question review table with diagnosis, and collapsible solutions.
-- **Error log export.** Download the flagged questions as JSON, or copy a tab-separated block that pastes straight into a spreadsheet error log.
+- **Error log export.** Download JSON with per-question timing for every question (`questionLog`) plus full detail on flagged questions (`errorLog`), or copy a tab-separated block that pastes straight into a spreadsheet error log.
 - **Practice mode.** Optional pausing, answer reveal after each question, and shuffled question order.
 - **Dark mode.**
 

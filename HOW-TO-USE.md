@@ -105,7 +105,7 @@ A single section's report also shows a projected total built from your most rece
 
 At the bottom of the report:
 
-- **Download JSON** saves a file named like `2026-09-22-quant-section-1-error-log.json` with the section summary, topic breakdown, and one entry per missed or off-pace question (topic, difficulty, your answer, the key, seconds, target, seconds over target, error type, diagnosis, and takeaway).
+- **Download JSON** saves a file named like `2026-09-22-quant-section-1-error-log.json` with the section summary, topic breakdown, a `questionLog` with one entry per question (position, id, topic, difficulty, type, seconds to 0.1 s, target, answered, correct, flagged, and diagnosis tag), and an `errorLog` with one entry per missed or off-pace question (topic, difficulty, your answer, the key, seconds, target, seconds over target, error type, diagnosis, and takeaway).
 - **Copy tab-separated** puts the same rows on your clipboard ready to paste into a spreadsheet error log.
 
 Do this before closing the tab — nothing is saved anywhere else.
