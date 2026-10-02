@@ -26,7 +26,7 @@ The review table diagnoses every question, and the pacing curve shows cumulative
 
 - **One section clock.** A single countdown for the whole section, like the real test. Warning state at 20% remaining, critical at 7%, auto-submit at zero.
 - **Per-question time banking.** Time is attributed to whichever question is on screen, including revisits, so the accounting survives jumping around.
-- **Question types.** Multiple choice, multi-select ("select all that apply"), and two-part analysis, with optional passage or data-table stimulus.
+- **Question types.** Multiple choice, multi-select ("select all that apply"), and two-part analysis, with optional passage or data-table stimulus. Multi-Source Reasoning sources can sit behind tabs, as on the exam.
 - **LaTeX rendering.** Math anywhere in a set — stems, choices, passages, table cells, explanations.
 - **Bold, italics, underline.** `**bold**`, `\textbf{}`, `\emph{}`, `\underline{}` in any text field — enough for Critical Reasoning boldface questions.
 - **Reading comprehension.** Multi-paragraph passages defined once and shared across questions, shown beside the question on wide screens.
@@ -54,7 +54,7 @@ Any static host works too — GitHub Pages, Netlify, an S3 bucket, or `python3 -
 
 Then:
 
-1. Click one of the **Load a sample** links (quant section, Data Insights, LaTeX demo, boldface CR, or reading comp), or bring your own: drag a set file onto the dropzone, click **Choose file**, or paste JSON and press **Add set**. Nothing ships bundled — the app starts empty on purpose. The sample links fetch from `example-sets/`, so they need the app served over http; opening `index.html` directly still works with Choose file.
+1. Click one of the **Load a sample** links (quant section, Data Insights, LaTeX demo, boldface CR, reading comp, or multi-source reasoning), or bring your own: drag a set file onto the dropzone, click **Choose file**, or paste JSON and press **Add set**. Nothing ships bundled — the app starts empty on purpose. The sample links fetch from `example-sets/`, so they need the app served over http; opening `index.html` directly still works with Choose file.
 2. Pick the set card you want, choose any options (shuffle, practice mode, reveal answers), and press **Start section**.
 3. Work the section. The clock does not stop unless practice mode is on.
 4. Read the report, then download the JSON error log.

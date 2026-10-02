@@ -1,0 +1,83 @@
+{
+  "id": "msr-demo",
+  "title": "Multi-Source Reasoning (demo)",
+  "section": "Data Insights",
+  "minutes": 6,
+  "note": "Three tabbed sources shared by two questions, as on the exam. Click a tab, or focus one and use the arrow keys.",
+  "passages": {
+    "warehouse": {
+      "title": "Warehouse expansion",
+      "tabs": [
+        {
+          "label": "Email 1",
+          "text": [
+            "From the operations director: Our current warehouse ships 1,200 orders per day at full capacity. Demand is forecast to grow 25% next year.",
+            "I propose leasing a second site rather than adding a night shift."
+          ]
+        },
+        {
+          "label": "Lease terms",
+          "text": "The second site would add capacity for 400 orders per day.",
+          "table": {
+            "headers": [
+              "Item",
+              "Monthly cost"
+            ],
+            "rows": [
+              [
+                "Base rent",
+                "18,000 dollars"
+              ],
+              [
+                "Utilities (estimate)",
+                "4,000 dollars"
+              ]
+            ]
+          }
+        },
+        {
+          "label": "Email 2",
+          "text": "From the finance lead: A night shift would add capacity for 300 orders per day at about 15,000 dollars per month in labor. It could start within two weeks."
+        }
+      ]
+    }
+  },
+  "questions": [
+    {
+      "id": 1,
+      "passage": "warehouse",
+      "topic": "Multi-Source Reasoning",
+      "diff": "Easy",
+      "target": 150,
+      "stem": "If demand grows as forecast, which option or options would provide enough capacity for next year's daily orders?",
+      "choices": [
+        "The second site only",
+        "The night shift only",
+        "Either option alone",
+        "Neither option alone",
+        "It cannot be determined from the sources"
+      ],
+      "answer": 2,
+      "why": "Forecast demand is 1,200 × 1.25 = 1,500 orders per day, so 300 more are needed. The second site adds 400 and the night shift adds 300, so either option alone is enough."
+    },
+    {
+      "id": 2,
+      "passage": "warehouse",
+      "topic": "Multi-Source Reasoning",
+      "diff": "Medium",
+      "target": 180,
+      "type": "multi",
+      "stem": "Select every statement that is supported by the sources.",
+      "choices": [
+        "The second site's estimated monthly cost exceeds the night shift's labor cost.",
+        "The night shift adds more capacity than the second site.",
+        "The night shift could begin sooner than the second site.",
+        "The finance lead's figures include utilities."
+      ],
+      "answers": [
+        0
+      ],
+      "why": "The second site costs 18,000 + 4,000 = 22,000 dollars per month, more than 15,000. The site adds 400 versus 300, so the second statement fails. No start date is given for the site, so the third is not supported, and nothing says the 15,000 includes utilities."
+    }
+  ]
+}

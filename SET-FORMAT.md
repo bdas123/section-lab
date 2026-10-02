@@ -58,6 +58,7 @@ Add `scoreContext` to a set to record your current score range for all three sec
 | `target` | no | Target seconds; defaults to section time ÷ question count |
 | `why` | recommended | Explanation shown in review and pushed to the error-log export |
 | `stimulus` | no | `{ title?, text: "..." or ["para 1", "para 2"], table?: { headers: [...], rows: [[...]] }, layout?: "split" \| "stacked" }` — reading passage, argument, or data table |
+| `stimulus.tabs` | no | Multi-Source Reasoning sources shown as tabs: `[{ "label": "Email 1", "text": "...", "table"?: {...} }, ...]`, at least two. Works inside a shared `passages` entry too |
 | `passage` | no | name of a shared passage in the set's top-level `passages` object (see Multiple paragraphs) |
 | `twoPartHeaders` | twopart | `["Column A label", "Column B label"]` |
 
@@ -122,5 +123,27 @@ Reading comprehension sets usually ask 3–4 questions about one passage. Instea
 ```
 
 A passage entry can also be a plain string or array. Anything in a question's own `stimulus` overrides the shared passage's fields.
+
+## Multi-Source Reasoning tabs
+
+On the exam, MSR sources sit behind tabs (an email, a table, a memo) and you click between them. Give the stimulus a `tabs` array, one entry per source, each with a `label` and `text`, a `table`, or both. Put the sources in a shared passage so every question in the group uses the same tabs:
+
+```json
+"passages": {
+  "warehouse": {
+    "title": "Warehouse expansion",
+    "tabs": [
+      { "label": "Email 1", "text": ["Paragraph one...", "Paragraph two..."] },
+      { "label": "Lease terms", "text": "Optional intro line.", "table": { "headers": ["Item", "Monthly cost"], "rows": [["Base rent", "18,000 dollars"]] } },
+      { "label": "Email 2", "text": "..." }
+    ]
+  }
+}
+```
+
+- The first tab opens by default. The tab you last opened stays open when you move to another question with the same sources, the way the exam behaves.
+- Click a tab, or focus one and use the left/right arrow keys (Home/End jump to the first/last). Arrow keys on a tab switch sources, not questions.
+- Tabbed stimuli sit beside the question on wide screens. Set `"layout": "stacked"` to put them above instead.
+- A `title` or `text` alongside `tabs` shows above the tab bar. See `example-sets/msr-demo.json`.
 
 **Layout.** When a stimulus has two or more paragraphs (or runs past about 900 characters) and no table, it sits in a scrollable column beside the question on screens 960px and wider, like the real exam; on narrow screens it stacks above. Set `"layout": "split"` or `"layout": "stacked"` on the stimulus to override. See `example-sets/rc-demo.json`.

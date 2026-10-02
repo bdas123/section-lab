@@ -30,6 +30,19 @@
       const okText = (v) => (typeof v === "string" && v.trim()) || (Array.isArray(v) && v.length && v.every((x) => typeof x === "string"));
       if (!okText(q.stem)) throw new Error(at + " has no stem");
       if (q.stimulus && q.stimulus.text != null && !okText(q.stimulus.text)) throw new Error(at + " has a stimulus.text that is not a string or an array of strings");
+      let stimTabs = null;
+      if (q.stimulus && q.stimulus.tabs != null) stimTabs = q.stimulus.tabs;
+      else if (q.passage != null && set.passages[q.passage] && set.passages[q.passage].tabs != null) stimTabs = set.passages[q.passage].tabs;
+      if (stimTabs !== null) {
+        if (!Array.isArray(stimTabs) || stimTabs.length < 2) throw new Error(at + " has stimulus.tabs that is not an array of at least two sources");
+        stimTabs.forEach(function (tb, j) {
+          const tat = at + " source tab " + (j + 1);
+          if (!tb || typeof tb !== "object" || typeof tb.label !== "string" || !tb.label.trim()) throw new Error(tat + " needs a 'label'");
+          if (tb.text == null && tb.table == null) throw new Error(tat + " needs 'text' or a 'table'");
+          if (tb.text != null && !okText(tb.text)) throw new Error(tat + " has a 'text' that is not a string or an array of strings");
+          if (tb.table != null && (!Array.isArray(tb.table.headers) || !Array.isArray(tb.table.rows))) throw new Error(tat + " has a table without 'headers' and 'rows' arrays");
+        });
+      }
       if (!Array.isArray(q.choices) || q.choices.length < 2) throw new Error(at + " needs at least two choices");
       const type = q.type || (Array.isArray(q.answers) ? (q.twoPartHeaders ? "twopart" : "multi") : "mcq");
       const inRange = (v) => Number.isInteger(v) && v >= 0 && v < q.choices.length;
@@ -336,7 +349,7 @@
     }
     S.reveal = $("optReveal").checked;
     S.pausable = $("optPausable").checked;
-    S.answers = {}; S.times = {}; S.flags = {};
+    S.answers = {}; S.times = {}; S.flags = {}; S.srcTab = {};
     S.cur = 0; S.finished = false; S.paused = false;
     S.total = set.minutes * 60;
     S.remaining = S.total;
@@ -398,6 +411,76 @@
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  function dataTable(table) {
+    const t = el("table", "data");
+    const thead = el("thead"), tr = el("tr");
+    table.headers.forEach((h) => tr.appendChild(el("th", null, h)));
+    thead.appendChild(tr); t.appendChild(thead);
+    const tb = el("tbody");
+    table.rows.forEach(function (row) {
+      const r = el("tr");
+      row.forEach((c) => r.appendChild(el("td", null, c)));
+      tb.appendChild(r);
+    });
+    t.appendChild(tb);
+    return t;
+  }
+
+  // Multi-Source Reasoning: one tab per source, like the exam. The open tab is remembered per stimulus,
+  // so moving between questions that share the same sources keeps the reader on the tab they last used.
+  function sourceTabs(tabs, key) {
+    S.srcTab = S.srcTab || {};
+    let cur = Math.min(S.srcTab[key] || 0, tabs.length - 1);
+    const wrap = el("div", "src-tabs");
+    const bar = el("div", "src-tabbar");
+    bar.setAttribute("role", "tablist");
+    bar.setAttribute("aria-label", "Sources");
+    const panels = [];
+    const btns = tabs.map(function (tb, i) {
+      const b = el("button", "src-tab", tb.label);
+      b.type = "button";
+      b.id = "srcTab" + i;
+      b.setAttribute("role", "tab");
+      b.setAttribute("aria-controls", "srcPanel" + i);
+      b.addEventListener("click", function () { select(i, false); });
+      b.addEventListener("keydown", function (e) {
+        let n = null;
+        if (e.key === "ArrowRight") n = (i + 1) % tabs.length;
+        else if (e.key === "ArrowLeft") n = (i - 1 + tabs.length) % tabs.length;
+        else if (e.key === "Home") n = 0;
+        else if (e.key === "End") n = tabs.length - 1;
+        if (n === null) return;
+        e.preventDefault(); e.stopPropagation();
+        select(n, true);
+      });
+      bar.appendChild(b);
+      const p = el("div", "src-panel");
+      p.id = "srcPanel" + i;
+      p.setAttribute("role", "tabpanel");
+      p.setAttribute("aria-labelledby", b.id);
+      if (tb.text) p.appendChild(prose(tb.text));
+      if (tb.table) p.appendChild(dataTable(tb.table));
+      panels.push(p);
+      return b;
+    });
+    function select(i, focus) {
+      cur = i; S.srcTab[key] = i;
+      btns.forEach(function (b, j) {
+        const on = j === i;
+        b.setAttribute("aria-selected", String(on));
+        b.tabIndex = on ? 0 : -1;
+        panels[j].hidden = !on;
+      });
+      if (focus) btns[i].focus();
+      const box = wrap.closest(".stimulus");
+      if (box) box.scrollTop = 0;
+    }
+    wrap.appendChild(bar);
+    panels.forEach((p) => wrap.appendChild(p));
+    select(cur, false);
+    return wrap;
+  }
+
   function renderQuestion() {
     const q = curQ();
     const k = curKey();
@@ -413,33 +496,22 @@
     const prevBox = stim.querySelector(".stimulus");
     const prevKey = stim.dataset.key || "";
     const prevScroll = prevBox ? prevBox.scrollTop : 0;
-    const stimKey = q.stimulus ? (q.passage != null ? "p:" + q.passage : "t:" + flatText(q.stimulus.text).slice(0, 200)) : "";
+    const stimKey = q.stimulus ? (q.passage != null ? "p:" + q.passage : q.stimulus.tabs ? "tabs:" + q.stimulus.tabs.map((tb) => tb.label + "|" + flatText(tb.text).slice(0, 80)).join("~") : "t:" + flatText(q.stimulus.text).slice(0, 200)) : "";
     stim.dataset.key = stimKey;
     stim.innerHTML = "";
     if (q.stimulus) {
       const box = el("div", "stimulus");
       if (q.stimulus.title) box.appendChild(el("div", "eyebrow stim-title", q.stimulus.title));
       if (q.stimulus.text) box.appendChild(prose(q.stimulus.text));
-      if (q.stimulus.table) {
-        const t = el("table", "data");
-        const thead = el("thead"), tr = el("tr");
-        q.stimulus.table.headers.forEach((h) => tr.appendChild(el("th", null, h)));
-        thead.appendChild(tr); t.appendChild(thead);
-        const tb = el("tbody");
-        q.stimulus.table.rows.forEach(function (row) {
-          const r = el("tr");
-          row.forEach((c) => r.appendChild(el("td", null, c)));
-          tb.appendChild(r);
-        });
-        t.appendChild(tb); box.appendChild(t);
-      }
+      if (q.stimulus.table) box.appendChild(dataTable(q.stimulus.table));
+      if (q.stimulus.tabs) box.appendChild(sourceTabs(q.stimulus.tabs, stimKey));
       stim.appendChild(box);
     }
     // long single-passage stimuli (reading comprehension) sit beside the question on wide screens
     const st = q.stimulus || {};
     const nParas = splitParas(st.text).length;
     const long = flatText(st.text).length > 900;
-    const split = st.layout === "split" || (st.layout !== "stacked" && !st.table && (nParas >= 2 || long));
+    const split = st.layout === "split" || (st.layout !== "stacked" && (!!st.tabs || (!st.table && (nParas >= 2 || long))));
     $("examCard").classList.toggle("split", !!split);
     const stimBox = stim.querySelector(".stimulus");
     if (stimBox && stimKey && stimKey === prevKey) requestAnimationFrame(() => { stimBox.scrollTop = prevScroll; });

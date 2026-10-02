@@ -37,6 +37,7 @@ Start with the samples in `example-sets/`:
 | `latex-sample.json` | 3 questions demonstrating LaTeX math rendering |
 | `boldface-demo.json` | 2 Critical Reasoning boldface questions plus a bold-and-math check |
 | `rc-demo.json` | a 3-paragraph passage shared by 3 RC questions, plus a 2-paragraph CR argument |
+| `msr-demo.json` | 2 Multi-Source Reasoning questions sharing three tabbed sources (two emails and a lease table) |
 
 Each loaded set shows as a card with its question count, time limit, and average seconds per question. Click a card to select it. Remove clears it. Sets live in the tab only, so reload the page and you start clean.
 
